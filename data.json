@@ -1,0 +1,52 @@
+{
+  "users": {
+    "user@company.com": {
+      "name": "User",
+      "role": "user",
+      "mood": "okay",
+      "stress": 5,
+      "productivity": 75,
+      "burnout": "Medium",
+      "status": "yellow"
+    },
+    "test@company.com": {
+      "name": "Test User",
+      "role": "user",
+      "mood": "okay",
+      "stress": 5,
+      "productivity": 75,
+      "burnout": "Medium",
+      "status": "yellow"
+    }
+  },
+  "team": [
+    {
+      "id": 1,
+      "name": "User A",
+      "productivity": "80%",
+      "burnout": "Low",
+      "status": "green"
+    },
+    {
+      "id": 2,
+      "name": "User B",
+      "productivity": "60%",
+      "burnout": "Medium",
+      "status": "yellow"
+    },
+    {
+      "id": 3,
+      "name": "User C",
+      "productivity": "40%",
+      "burnout": "High",
+      "status": "red"
+    },
+    {
+      "id": 1777478385748,
+      "name": "Test User",
+      "productivity": "75%",
+      "burnout": "Medium",
+      "status": "yellow"
+    }
+  ]
+}
