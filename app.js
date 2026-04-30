@@ -1,9 +1,9 @@
 // App State
 let currentUser = null;
 let notifications = [
-    { id: 1, type: 'danger', title: 'High Burnout Risk', message: 'Your stress level has been high for 3 days.', time: '2 mins ago', read: false },
-    { id: 2, type: 'warning', title: 'Productivity Drop', message: 'Your activity decreased by 15% this week.', time: '1 hour ago', read: false },
-    { id: 3, type: 'healthy', title: 'Goal Achieved', message: 'You maintained optimal focus hours!', time: '1 day ago', read: true }
+    { id: 1, type: 'danger', priority: 'high', category: 'burnout', title: 'High Burnout Risk', message: 'Your stress level has been high for 3 days.', employee: 'You', time: '2 mins ago', read: false, rootCause: 'Sustained high workload + low sleep', suggestedAction: 'Schedule a break and check-in with manager' },
+    { id: 2, type: 'warning', priority: 'medium', category: 'drift', title: 'Productivity Drop', message: 'Your activity decreased by 15% this week.', employee: 'You', time: '1 hour ago', read: false, rootCause: 'Irregular work patterns detected', suggestedAction: 'Review task priorities and block focus time' },
+    { id: 3, type: 'healthy', priority: 'low', category: 'system', title: 'Goal Achieved', message: 'You maintained optimal focus hours!', employee: 'You', time: '1 day ago', read: true, rootCause: '', suggestedAction: '' }
 ];
 
 
@@ -132,6 +132,11 @@ function switchScreen(screenId) {
     
     const sidebar = document.querySelector('.sidebar');
     if (sidebar) sidebar.classList.remove('open');
+    
+    // Screen-specific hooks
+    if (screenId === 'alerts-screen') renderAlertCenter();
+    if (screenId === 'employees-screen') renderEmployeeRoster();
+    if (screenId === 'profile-screen') populateProfileData();
 }
 
 
@@ -149,23 +154,68 @@ function renderNotifications() {
     const list = document.getElementById('notification-list');
     list.innerHTML = '';
     
+    const priorityFilter = document.getElementById('notif-filter-priority')?.value || 'all';
     let unreadCount = 0;
     
-    notifications.forEach(n => {
+    const filtered = notifications.filter(n => {
+        if (priorityFilter !== 'all' && n.priority !== priorityFilter) return false;
+        return true;
+    });
+    
+    // Smart grouping: merge similar alerts
+    const grouped = [];
+    const seen = new Set();
+    filtered.forEach(n => {
+        const key = `${n.category}_${n.priority}`;
         if (!n.read) unreadCount++;
-        
+        if (seen.has(key) && n.category !== 'system') {
+            const existing = grouped.find(g => `${g.category}_${g.priority}` === key);
+            if (existing) { existing.groupCount = (existing.groupCount || 1) + 1; return; }
+        }
+        seen.add(key);
+        grouped.push({...n, groupCount: 1});
+    });
+    
+    grouped.forEach(n => {
         const item = document.createElement('div');
         item.className = `notification-item ${n.type}`;
         item.style.opacity = n.read ? '0.6' : '1';
+        item.style.cursor = 'pointer';
+        item.style.transition = 'all 0.2s';
+        
+        const priorityBadge = n.priority === 'critical' ? '🔴' : n.priority === 'high' ? '🟠' : n.priority === 'medium' ? '🟡' : '🟢';
+        const groupLabel = n.groupCount > 1 ? ` <span style="background: var(--primary); color: #000; padding: 1px 6px; border-radius: 8px; font-size: 0.7rem; font-weight: 600;">+${n.groupCount - 1} similar</span>` : '';
+        
         item.innerHTML = `
-            <div style="font-weight: 600;">${n.title}</div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span>${priorityBadge}</span>
+                <span style="font-weight: 600;">${n.title}${groupLabel}</span>
+                ${!n.read ? '<span style="width: 6px; height: 6px; background: var(--primary); border-radius: 50; display: inline-block; margin-left: auto;"></span>' : ''}
+            </div>
             <div style="font-size: 0.9rem; color: var(--text-muted);">${n.message}</div>
-            <div class="notification-time">${n.time}</div>
+            <div class="notification-time">${n.time} · ${n.employee || ''}</div>
+            <div id="notif-detail-${n.id}" style="display: none; margin-top: 8px; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px; border-left: 3px solid var(--primary); font-size: 0.8rem;">
+                ${n.rootCause ? `<div><strong>Root cause:</strong> ${n.rootCause}</div>` : ''}
+                ${n.suggestedAction ? `<div style="margin-top: 4px;"><strong>Action:</strong> ${n.suggestedAction}</div>` : ''}
+                <div style="margin-top: 6px; display: flex; gap: 6px;">
+                    <button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.7rem;" onclick="event.stopPropagation(); markNotifRead(${n.id})">Mark read</button>
+                </div>
+            </div>
         `;
+        item.onclick = () => {
+            const detail = document.getElementById(`notif-detail-${n.id}`);
+            if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+        };
         list.appendChild(item);
     });
     
     document.getElementById('unread-dot').style.display = unreadCount > 0 ? 'block' : 'none';
+}
+
+function markNotifRead(id) {
+    const n = notifications.find(n => n.id === id);
+    if (n) n.read = true;
+    renderNotifications();
 }
 
 function markAllRead() {
@@ -1559,6 +1609,275 @@ window.addEventListener('DOMContentLoaded', () => {
         camera.updateProjectionMatrix();
     });
 });
+
+// ===== EMPLOYEE MANAGEMENT =====
+let managedEmployees = JSON.parse(localStorage.getItem('mindguard_managed_employees') || '[]');
+
+function addEmployee() {
+    const name = document.getElementById('emp-name')?.value?.trim();
+    const email = document.getElementById('emp-email')?.value?.trim();
+    const role = document.getElementById('emp-role-input')?.value?.trim();
+    const dept = document.getElementById('emp-dept-input')?.value;
+    if (!name || !email || !role) { alert('Name, Role, and Email are required.'); return; }
+    const emp = {
+        id: document.getElementById('emp-id')?.value?.trim() || `EMP-${Date.now().toString(36).toUpperCase()}`,
+        name, email, role, dept,
+        manager: document.getElementById('emp-manager')?.value?.trim() || 'Unassigned',
+        team: document.getElementById('emp-team')?.value?.trim() || dept,
+        projects: document.getElementById('emp-projects')?.value?.trim() || '',
+        phone: document.getElementById('emp-phone')?.value?.trim() || '',
+        addedAt: new Date().toISOString(),
+        // Auto-generated metrics
+        burnout: Math.floor(15 + Math.random() * 40),
+        productivity: Math.floor(55 + Math.random() * 35),
+        heart_rate: Math.floor(65 + Math.random() * 30),
+        sleep_hours: parseFloat((5.5 + Math.random() * 3).toFixed(1)),
+        fatigue_level: Math.floor(2 + Math.random() * 6),
+        working_hours: parseFloat((6 + Math.random() * 5).toFixed(1)),
+        taskCompletion: Math.floor(65 + Math.random() * 30),
+        reworkFreq: Math.floor(3 + Math.random() * 18),
+        focusTime: parseFloat((3 + Math.random() * 4).toFixed(1)),
+        outputQuality: Math.floor(60 + Math.random() * 35)
+    };
+    emp.risk = emp.burnout >= 70 ? 'High' : emp.burnout >= 40 ? 'Medium' : 'Low';
+    emp.status = emp.burnout >= 65 ? 'Critical' : emp.burnout >= 40 ? 'Drifting' : 'Stable';
+    managedEmployees.push(emp);
+    localStorage.setItem('mindguard_managed_employees', JSON.stringify(managedEmployees));
+    ['emp-name','emp-id','emp-role-input','emp-manager','emp-team','emp-projects','emp-email','emp-phone'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    renderEmployeeRoster();
+    alert(`✅ ${name} added successfully!`);
+}
+
+function handleCSVUpload(event) {
+    const file = event.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split('\n').filter(l => l.trim());
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        let count = 0;
+        for (let i = 1; i < lines.length; i++) {
+            const vals = lines[i].split(',').map(v => v.trim());
+            const get = (key) => vals[headers.indexOf(key)] || '';
+            if (!get('name')) continue;
+            const b = Math.floor(15 + Math.random() * 40);
+            managedEmployees.push({
+                id: get('id') || `EMP-${Date.now().toString(36).toUpperCase()}${i}`,
+                name: get('name'), email: get('email') || `${get('name').replace(/\s/g,'').toLowerCase()}@company.com`,
+                role: get('role') || 'Employee', dept: get('department') || 'Engineering',
+                manager: get('manager') || 'Unassigned', team: get('team') || 'General',
+                projects: get('projects') || '', phone: get('phone') || '',
+                addedAt: new Date().toISOString(), burnout: b, productivity: Math.floor(55 + Math.random() * 35),
+                heart_rate: Math.floor(65 + Math.random() * 30), sleep_hours: parseFloat((5.5 + Math.random() * 3).toFixed(1)),
+                fatigue_level: Math.floor(2 + Math.random() * 6), working_hours: parseFloat((6 + Math.random() * 5).toFixed(1)),
+                taskCompletion: Math.floor(65 + Math.random() * 30), reworkFreq: Math.floor(3 + Math.random() * 18),
+                focusTime: parseFloat((3 + Math.random() * 4).toFixed(1)), outputQuality: Math.floor(60 + Math.random() * 35),
+                risk: b >= 70 ? 'High' : b >= 40 ? 'Medium' : 'Low',
+                status: b >= 65 ? 'Critical' : b >= 40 ? 'Drifting' : 'Stable'
+            });
+            count++;
+        }
+        localStorage.setItem('mindguard_managed_employees', JSON.stringify(managedEmployees));
+        renderEmployeeRoster();
+        alert(`✅ ${count} employees imported from CSV!`);
+    };
+    reader.readAsText(file);
+}
+
+function getAllEmployees() {
+    const sim = JSON.parse(localStorage.getItem('mindguard_sim_data') || '{}');
+    const simEmps = (sim.employees || []).map(e => ({...e, source: 'simulated', id: e.id || `SIM-${e.name?.replace(/\s/g,'')}`,
+        taskCompletion: e.taskCompletion || Math.floor(65 + Math.random() * 30),
+        reworkFreq: e.reworkFreq || Math.floor(3 + Math.random() * 18),
+        focusTime: e.focusTime || parseFloat((3 + Math.random() * 4).toFixed(1)),
+        outputQuality: e.outputQuality || Math.floor(60 + Math.random() * 35),
+        status: (e.burnout >= 65 ? 'Critical' : e.burnout >= 40 ? 'Drifting' : 'Stable')
+    }));
+    return [...simEmps, ...managedEmployees.map(e => ({...e, source: 'manual'}))];
+}
+
+function renderEmployeeRoster() {
+    const container = document.getElementById('employee-roster'); if (!container) return;
+    const search = (document.getElementById('emp-search')?.value || '').toLowerCase();
+    const deptFilter = document.getElementById('emp-filter-dept')?.value || 'all';
+    const statusFilter = document.getElementById('emp-filter-status')?.value || 'all';
+    let emps = getAllEmployees();
+    if (search) emps = emps.filter(e => (e.name||'').toLowerCase().includes(search) || (e.dept||'').toLowerCase().includes(search));
+    if (deptFilter !== 'all') emps = emps.filter(e => e.dept === deptFilter);
+    if (statusFilter !== 'all') emps = emps.filter(e => e.status === statusFilter);
+    document.getElementById('emp-count-label').textContent = `${emps.length} employees`;
+    if (emps.length === 0) { container.innerHTML = '<div style="color: var(--text-muted); padding: 20px; text-align: center;">No employees found. Add employees or generate sample data.</div>'; return; }
+    container.innerHTML = emps.map((e, i) => {
+        const sc = e.status === 'Critical' ? 'danger' : e.status === 'Drifting' ? 'warning' : 'success';
+        const rc = e.risk === 'High' ? 'danger' : e.risk === 'Medium' ? 'warning' : 'success';
+        const aiSummary = generateAISummary(e);
+        return `<div style="border: 1px solid var(--glass-border); border-radius: 8px; margin-bottom: 8px; overflow: hidden;">
+            <div style="padding: 12px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="document.getElementById('emp-expand-${i}').style.display = document.getElementById('emp-expand-${i}').style.display === 'none' ? 'block' : 'none'">
+                <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem;">${(e.name||'?').charAt(0)}</div>
+                <div style="flex: 1;"><div style="font-weight: 600;">${e.name}</div><div style="font-size: 0.8rem; color: var(--text-muted);">${e.role || ''} · ${e.dept || ''}</div></div>
+                <span class="status-indicator status-${sc}" style="font-size: 0.75rem; padding: 2px 8px;">${e.status}</span>
+                <span style="font-size: 0.8rem; color: var(--${rc}); font-weight: 600;">${e.risk}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">▼</span>
+            </div>
+            <div id="emp-expand-${i}" style="display: none; padding: 0 16px 16px; border-top: 1px solid var(--glass-border);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-top: 12px;">
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Task Completion</div><div style="font-weight: 700; color: var(--primary);">${e.taskCompletion}%</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Focus Time</div><div style="font-weight: 700; color: #8b5cf6;">${e.focusTime}h</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Rework</div><div style="font-weight: 700; color: var(--warning);">${e.reworkFreq}%</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Output Quality</div><div style="font-weight: 700; color: var(--success);">${e.outputQuality}%</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Heart Rate</div><div style="font-weight: 700; color: #ef4444;">${e.heart_rate} bpm</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Sleep</div><div style="font-weight: 700; color: #8b5cf6;">${e.sleep_hours}h</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Fatigue</div><div style="font-weight: 700; color: #f59e0b;">${e.fatigue_level}/10</div></div>
+                    <div style="text-align: center; padding: 8px; background: rgba(255,255,255,0.02); border-radius: 6px;"><div style="font-size: 0.75rem; color: var(--text-muted);">Burnout Score</div><div style="font-weight: 700; color: var(--${rc});">${e.burnout}</div></div>
+                </div>
+                <div style="margin-top: 12px; padding: 10px; background: rgba(0,255,255,0.03); border-radius: 6px; border-left: 3px solid var(--primary);">
+                    <div style="font-size: 0.8rem; font-weight: 600; color: var(--primary);">🤖 AI Summary</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">${aiSummary}</div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">Manager: ${e.manager||'N/A'} · Team: ${e.team||'N/A'} · ${e.email||''}</div>
+            </div></div>`;
+    }).join('');
+}
+
+function generateAISummary(e) {
+    const issues = [];
+    if (e.burnout >= 60) issues.push('elevated burnout risk');
+    if (e.sleep_hours < 5) issues.push('critically low sleep');
+    if (e.fatigue_level > 7) issues.push('high fatigue');
+    if (e.reworkFreq > 15) issues.push('excessive rework cycles');
+    if (e.taskCompletion < 60) issues.push('declining task completion');
+    if (e.working_hours > 10) issues.push('overwork pattern detected');
+    if (issues.length === 0) return `${e.name} is performing within normal parameters. No anomalies detected.`;
+    return `Performance concern: ${issues.join(', ')}. Recommend ${e.burnout >= 60 ? 'immediate check-in and workload review' : 'monitoring over next 3 days'}.`;
+}
+
+// ===== ALERT CENTER ENGINE =====
+let systemAlerts = [];
+
+function generateSystemAlerts() {
+    systemAlerts = [];
+    const emps = getAllEmployees();
+    const now = new Date();
+    const cats = ['burnout', 'drift', 'behavior', 'system'];
+    const depts = ['Engineering', 'Marketing', 'Sales', 'Design', 'HR'];
+    const seenKeys = new Set();
+
+    emps.forEach(e => {
+        // Burnout alerts
+        if (e.burnout >= 70) {
+            const k = `burnout_high_${e.name}`;
+            if (!seenKeys.has(k)) { seenKeys.add(k); systemAlerts.push({ severity: 'critical', category: 'burnout', employee: e.name, dept: e.dept, desc: `Burnout score at ${e.burnout} — immediate intervention needed`, rootCause: `Sustained overwork (${e.working_hours}h/day) + low sleep (${e.sleep_hours}h)`, action: 'Reduce workload, schedule 1:1 check-in', ts: new Date(now - Math.random()*3600000) }); }
+        } else if (e.burnout >= 50) {
+            const k = `burnout_med_${e.name}`;
+            if (!seenKeys.has(k)) { seenKeys.add(k); systemAlerts.push({ severity: 'high', category: 'burnout', employee: e.name, dept: e.dept, desc: `Burnout score rising to ${e.burnout}`, rootCause: `Fatigue level ${e.fatigue_level}/10, irregular patterns`, action: 'Monitor closely, suggest break', ts: new Date(now - Math.random()*7200000) }); }
+        }
+        // Drift alerts
+        if (e.productivity < 50) {
+            systemAlerts.push({ severity: 'medium', category: 'drift', employee: e.name, dept: e.dept, desc: `Productivity at ${e.productivity}% — below baseline`, rootCause: 'Possible disengagement or task mismatch', action: 'Review task assignments', ts: new Date(now - Math.random()*14400000) });
+        }
+        // Behavior alerts
+        if (e.reworkFreq > 18) {
+            systemAlerts.push({ severity: 'medium', category: 'behavior', employee: e.name, dept: e.dept, desc: `Rework frequency at ${e.reworkFreq}%`, rootCause: 'Unclear requirements or skill gap', action: 'Pair with senior, clarify specs', ts: new Date(now - Math.random()*21600000) });
+        }
+        if (e.sleep_hours < 4.5) {
+            systemAlerts.push({ severity: 'high', category: 'burnout', employee: e.name, dept: e.dept, desc: `Sleep critically low at ${e.sleep_hours}h`, rootCause: 'Possible chronic sleep deprivation', action: 'Flag for wellness check', ts: new Date(now - Math.random()*7200000) });
+        }
+    });
+
+    // System-level alerts
+    systemAlerts.push({ severity: 'low', category: 'system', employee: 'System', dept: 'All', desc: 'Daily diagnostics completed', rootCause: '', action: '', ts: new Date(now - 60000) });
+    systemAlerts.push({ severity: 'low', category: 'system', employee: 'System', dept: 'All', desc: `${emps.length} employees tracked`, rootCause: '', action: '', ts: now });
+
+    // Enforce balance: critical+high in single digits
+    let critCount = systemAlerts.filter(a => a.severity === 'critical').length;
+    let highCount = systemAlerts.filter(a => a.severity === 'high').length;
+    if (critCount + highCount > 9) {
+        let excess = critCount + highCount - 9;
+        for (let i = systemAlerts.length - 1; i >= 0 && excess > 0; i--) {
+            if (systemAlerts[i].severity === 'high') { systemAlerts[i].severity = 'medium'; excess--; }
+        }
+    }
+    systemAlerts.sort((a, b) => b.ts - a.ts);
+
+    // Sync to notification panel
+    const newNotifs = systemAlerts.slice(0, 8).map((a, i) => ({
+        id: 100 + i, type: a.severity === 'critical' ? 'danger' : a.severity === 'high' ? 'danger' : a.severity === 'medium' ? 'warning' : 'healthy',
+        priority: a.severity, category: a.category, title: `${a.category === 'burnout' ? '🔥' : a.category === 'drift' ? '📉' : a.category === 'behavior' ? '⚠️' : 'ℹ️'} ${a.desc.substring(0, 50)}`,
+        message: a.desc, employee: a.employee, time: a.ts.toLocaleTimeString(), read: a.severity === 'low',
+        rootCause: a.rootCause, suggestedAction: a.action
+    }));
+    notifications = [...newNotifs, ...notifications.filter(n => n.id < 100)];
+    renderNotifications();
+}
+
+function renderAlertCenter() {
+    if (systemAlerts.length === 0) generateSystemAlerts();
+    const sevFilter = document.getElementById('alert-filter-severity')?.value || 'all';
+    const catFilter = document.getElementById('alert-filter-category')?.value || 'all';
+    const deptFilter = document.getElementById('alert-filter-dept')?.value || 'all';
+    const timeFilter = document.getElementById('alert-filter-time')?.value || 'all';
+    const now = Date.now();
+    let filtered = systemAlerts.filter(a => {
+        if (sevFilter !== 'all' && a.severity !== sevFilter) return false;
+        if (catFilter !== 'all' && a.category !== catFilter) return false;
+        if (deptFilter !== 'all' && a.dept !== deptFilter) return false;
+        if (timeFilter === '1h' && now - a.ts.getTime() > 3600000) return false;
+        if (timeFilter === '24h' && now - a.ts.getTime() > 86400000) return false;
+        if (timeFilter === '7d' && now - a.ts.getTime() > 604800000) return false;
+        return true;
+    });
+    // Update KPIs
+    const crit = filtered.filter(a => a.severity === 'critical').length;
+    const high = filtered.filter(a => a.severity === 'high').length;
+    const med = filtered.filter(a => a.severity === 'medium').length;
+    const low = filtered.filter(a => a.severity === 'low').length;
+    document.getElementById('critical-alerts').textContent = crit;
+    document.getElementById('high-alerts').textContent = high;
+    document.getElementById('medium-alerts').textContent = med;
+    document.getElementById('low-alerts').textContent = low;
+    document.getElementById('total-alerts-count').textContent = filtered.length;
+
+    const tbody = document.getElementById('alerts-log-body');
+    if (!tbody) return;
+    tbody.innerHTML = filtered.map((a, i) => {
+        const sevColor = a.severity === 'critical' ? 'var(--danger)' : a.severity === 'high' ? 'var(--warning)' : a.severity === 'medium' ? 'var(--primary)' : 'var(--success)';
+        const catIcon = a.category === 'burnout' ? '🔥' : a.category === 'drift' ? '📉' : a.category === 'behavior' ? '⚠️' : '⚙️';
+        return `<tr style="border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onclick="expandAlertDetail(${i})">
+            <td style="padding: 10px; font-size: 0.85rem;">${a.ts.toLocaleString()}</td>
+            <td style="padding: 10px; color: ${sevColor}; font-weight: bold; text-transform: uppercase; font-size: 0.8rem;">${a.severity}</td>
+            <td style="padding: 10px; font-size: 0.85rem;">${catIcon} ${a.category}</td>
+            <td style="padding: 10px; font-size: 0.85rem;">${a.employee}</td>
+            <td style="padding: 10px; font-size: 0.85rem;">${a.desc}</td>
+            <td style="padding: 10px;"><button class="btn btn-outline" style="padding: 2px 8px; font-size: 0.7rem;" onclick="event.stopPropagation(); alertQuickAction(${i})">Action</button></td>
+        </tr>`;
+    }).join('');
+}
+
+function expandAlertDetail(idx) {
+    const a = systemAlerts[idx]; if (!a) return;
+    const panel = document.getElementById('alert-detail-panel');
+    document.getElementById('alert-detail-title').textContent = `${a.category.toUpperCase()} Alert — ${a.employee}`;
+    document.getElementById('alert-detail-content').innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div><strong>Severity:</strong> <span style="color: var(--${a.severity === 'critical' ? 'danger' : a.severity === 'high' ? 'warning' : 'primary'}); text-transform: uppercase;">${a.severity}</span></div>
+            <div><strong>Department:</strong> ${a.dept}</div>
+            <div><strong>Category:</strong> ${a.category}</div>
+            <div><strong>Time:</strong> ${a.ts.toLocaleString()}</div>
+        </div>
+        <div style="margin-top: 12px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 6px;"><strong>Description:</strong> ${a.desc}</div>
+        ${a.rootCause ? `<div style="margin-top: 8px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 6px; border-left: 3px solid var(--warning);"><strong>🤖 AI Root Cause:</strong> ${a.rootCause}</div>` : ''}
+        ${a.action ? `<div style="margin-top: 8px; padding: 10px; background: rgba(255,255,255,0.02); border-radius: 6px; border-left: 3px solid var(--primary);"><strong>Suggested Action:</strong> ${a.action}</div>` : ''}
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="btn btn-primary" style="padding: 6px 16px; font-size: 0.85rem;" onclick="alert('Intervention assigned for ${a.employee}')">Assign Intervention</button>
+            <button class="btn btn-outline" style="padding: 6px 16px; font-size: 0.85rem;" onclick="alert('Manager notification sent for ${a.employee}')">Notify Manager</button>
+        </div>`;
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+function alertQuickAction(idx) {
+    const a = systemAlerts[idx]; if (!a) return;
+    alert(`Quick Action for ${a.employee}:\n\n📋 ${a.desc}\n🤖 Root cause: ${a.rootCause || 'N/A'}\n✅ Suggested: ${a.action || 'Monitor'}\n\nNotification sent to ${a.employee}'s manager.`);
+}
 
 // --- Restore user session on refresh safely ---
 function initApp() {
