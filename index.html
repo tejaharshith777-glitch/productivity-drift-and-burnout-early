@@ -328,6 +328,14 @@
                                 <button class="btn btn-outline" onclick="clearSimulatorData()">Clear</button>
                             </div>
                         </div>
+
+                        <!-- NEW: Manager Notifications -->
+                        <div class="glass-card glass" style="margin-top: 24px; border-color: var(--warning);">
+                            <h3>📧 Manager Notifications</h3>
+                            <p style="color: var(--text-muted); margin: 12px 0;">Scans all employees for high burnout risk (>60) and generates a detailed alert report for each employee's manager, including AI-recommended intervention actions.</p>
+                            <button class="btn btn-primary" onclick="sendManagerNotifications()" style="margin-top: 8px;">Check & Send Burnout Alert Emails Now</button>
+                            <div id="manager-notif-results" style="margin-top: 16px;"></div>
+                        </div>
                     </section>
 
                     <!-- B. Alerts Center -->
@@ -445,6 +453,76 @@
                                 <canvas id="focusTimeChart"></canvas>
                             </div>
                         </div>
+
+                        <!-- NEW: Department Ranking Table -->
+                        <div class="glass-card glass" style="margin-top: 24px;">
+                            <h3>🏢 Department Ranking</h3>
+                            <p style="color: var(--text-muted); margin: 8px 0 16px;">Ranked by burnout risk (highest first)</p>
+                            <div class="table-responsive">
+                                <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--glass-border);">
+                                            <th style="padding: 12px;">#</th>
+                                            <th style="padding: 12px;">Department</th>
+                                            <th style="padding: 12px;">Burnout Risk</th>
+                                            <th style="padding: 12px;">Prod</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dept-ranking-body">
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 12px;">1</td>
+                                            <td style="padding: 12px;">Marketing</td>
+                                            <td style="padding: 12px; color: var(--danger); font-weight: bold;">25</td>
+                                            <td style="padding: 12px;">63%</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 12px;">2</td>
+                                            <td style="padding: 12px;">Sales</td>
+                                            <td style="padding: 12px; color: var(--danger); font-weight: bold;">23</td>
+                                            <td style="padding: 12px;">59%</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 12px;">3</td>
+                                            <td style="padding: 12px;">Design</td>
+                                            <td style="padding: 12px; color: var(--warning); font-weight: bold;">21</td>
+                                            <td style="padding: 12px;">66%</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 12px;">4</td>
+                                            <td style="padding: 12px;">Finance</td>
+                                            <td style="padding: 12px; color: var(--warning); font-weight: bold;">15</td>
+                                            <td style="padding: 12px;">63%</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 12px;">5</td>
+                                            <td style="padding: 12px;">Engineering</td>
+                                            <td style="padding: 12px; color: var(--primary); font-weight: bold;">14</td>
+                                            <td style="padding: 12px;">65%</td>
+                                        </tr>
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding: 12px;">6</td>
+                                            <td style="padding: 12px;">HR</td>
+                                            <td style="padding: 12px; color: var(--primary); font-weight: bold;">14</td>
+                                            <td style="padding: 12px;">65%</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 12px;">7</td>
+                                            <td style="padding: 12px;">Operations</td>
+                                            <td style="padding: 12px; color: var(--success); font-weight: bold;">4</td>
+                                            <td style="padding: 12px;">65%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Work Session Heatmap -->
+                        <div class="glass-card glass" style="margin-top: 24px;">
+                            <h3>🕐 Work Session Heatmap</h3>
+                            <p style="color: var(--text-muted); margin: 8px 0 4px;">Login/logout frequency by day & hour</p>
+                            <div style="display: inline-block; padding: 4px 10px; background: var(--primary); color: #000; border-radius: 12px; font-size: 0.8rem; font-weight: 600; margin-bottom: 16px;">Peak: 9 AM</div>
+                            <div id="work-session-heatmap" style="overflow-x: auto;"></div>
+                        </div>
                     </section>
 
                     <!-- D. Team Heatmap -->
@@ -504,10 +582,12 @@
                             </div>
                             <div class="glass-card glass">
                                 <h3>Recent Alerts Breakdown</h3>
-                                <ul class="suggestions-list" style="margin-top: 16px;">
-                                    <li style="border-left-color: var(--danger);">🚨 <strong>Sales Team:</strong> Rework spike detected (+15%)</li>
-                                    <li style="border-left-color: var(--warning);">⚠️ <strong>Product:</strong> 4 devs working past 10 PM.</li>
-                                    <li style="border-left-color: var(--primary);">ℹ️ <strong>Design:</strong> Focus time optimized (+5%).</li>
+                                <ul class="suggestions-list" style="margin-top: 16px;" id="drift-alerts-list">
+                                    <li style="border-left-color: var(--danger);">🚨 <strong>High:</strong> Tasks per hour rate dropped 35% compared to their 30-day baseline. Consider checking in.</li>
+                                    <li style="border-left-color: var(--danger);">🚨 <strong>Critical:</strong> Camera rate dropped 25% compared to their 30-day baseline. Consider checking in.</li>
+                                    <li style="border-left-color: var(--warning);">⚠️ <strong>Moderate:</strong> Focus hours decreased 12% this week across Engineering team.</li>
+                                    <li style="border-left-color: var(--warning);">⚠️ <strong>Moderate:</strong> Rework frequency increased 18% for 3 team members in Sales.</li>
+                                    <li style="border-left-color: var(--primary);">ℹ️ <strong>Info:</strong> Design team output quality improved +5%. No action required.</li>
                                 </ul>
                             </div>
                         </div>

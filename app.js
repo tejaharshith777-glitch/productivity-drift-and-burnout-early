@@ -87,6 +87,7 @@ function login(user) {
     initCharts();
     renderNotifications();
     fetchTeamData();
+    renderWorkSessionHeatmap();
 }
 
 function logout() {
@@ -746,6 +747,124 @@ function clearSimulatorData() {
     document.getElementById('high-alerts').textContent = '0';
     document.getElementById('medium-alerts').textContent = '0';
     document.getElementById('low-alerts').textContent = '0';
+}
+
+
+// --- NEW: Manager Notifications Scanner ---
+function sendManagerNotifications() {
+    const saved = localStorage.getItem('mindguard_sim_data');
+    if (!saved) {
+        alert('No simulation data found. Please generate sample data first.');
+        return;
+    }
+    
+    try {
+        const { employees } = JSON.parse(saved);
+        const highRisk = employees.filter(emp => emp.burnout > 60);
+        const resultsDiv = document.getElementById('manager-notif-results');
+        
+        if (highRisk.length === 0) {
+            resultsDiv.innerHTML = '<div style="color: var(--success); padding: 12px;">✅ No employees with burnout risk >60 found. All clear!</div>';
+            return;
+        }
+        
+        let html = `<div style="padding: 12px; background: rgba(255,204,0,0.1); border-radius: 8px; border-left: 4px solid var(--warning); margin-bottom: 12px;">
+            <strong>📧 ${highRisk.length} burnout alert emails generated</strong>
+            <div style="color: var(--text-muted); font-size: 0.9rem; margin-top: 4px;">Scanning ${employees.length} employees — ${highRisk.length} exceeded risk threshold (>60)</div>
+        </div>`;
+        
+        html += '<div style="max-height: 300px; overflow-y: auto;">';
+        highRisk.forEach((emp, i) => {
+            let action = '🌴 Recommended: 2-day wellness break';
+            let severity = 'Medium';
+            let sevColor = 'var(--warning)';
+            
+            if (emp.burnout > 85) {
+                action = '🚀 Emergency: Immediate 1-week administrative leave';
+                severity = 'Critical';
+                sevColor = 'var(--danger)';
+            } else if (emp.burnout > 75) {
+                action = '⚠️ Urgent: Pause ongoing deliverables & schedule 1-on-1';
+                severity = 'High';
+                sevColor = 'var(--danger)';
+            }
+            
+            html += `<div style="padding: 10px; margin: 6px 0; background: rgba(255,255,255,0.02); border-radius: 6px; border-left: 3px solid ${sevColor};">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong>${emp.name}</strong>
+                    <span style="color: ${sevColor}; font-size: 0.8rem; font-weight: bold;">${severity}</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">Dept: ${emp.dept} | Burnout: ${emp.burnout} | Prod: ${emp.prod}%</div>
+                <div style="font-size: 0.85rem; color: var(--primary); margin-top: 4px;">AI Action: ${action}</div>
+            </div>`;
+        });
+        html += '</div>';
+        
+        resultsDiv.innerHTML = html;
+        alert(`✅ Burnout Alert Report Generated!\n\n${highRisk.length} high-risk employees identified.\nEmails queued for their respective managers.`);
+    } catch(e) {
+        console.error('Manager notification error:', e);
+    }
+}
+
+
+// --- NEW: Work Session Heatmap Renderer ---
+function renderWorkSessionHeatmap() {
+    const container = document.getElementById('work-session-heatmap');
+    if (!container) return;
+    
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const hours = ['6 AM', '7 AM', '8 AM', '9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM'];
+    
+    // Generate realistic intensity data (higher during 9am-12pm on weekdays)
+    const data = days.map((day, di) => {
+        return hours.map((hr, hi) => {
+            const isWeekday = di < 5;
+            const isPeakHour = hi >= 2 && hi <= 6; // 8am-12pm
+            const isMorning = hi >= 1 && hi <= 8;  // 7am-3pm
+            
+            let base = Math.random() * 0.3;
+            if (isWeekday && isPeakHour) base = 0.6 + Math.random() * 0.4;
+            else if (isWeekday && isMorning) base = 0.3 + Math.random() * 0.4;
+            else if (!isWeekday) base = Math.random() * 0.25;
+            
+            return Math.min(1, base);
+        });
+    });
+    
+    let html = '<table style="border-collapse: collapse; width: 100%;">';
+    html += '<thead><tr><th style="padding: 8px; color: var(--text-muted); font-size: 0.8rem;"></th>';
+    hours.forEach(h => {
+        html += `<th style="padding: 6px 8px; color: var(--text-muted); font-size: 0.75rem; text-align: center;">${h}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    days.forEach((day, di) => {
+        html += `<tr><td style="padding: 8px; font-weight: 600; font-size: 0.85rem; color: var(--text-main);">${day}</td>`;
+        data[di].forEach(intensity => {
+            const r = Math.floor(intensity * 0);
+            const g = Math.floor(intensity * 229);
+            const b = Math.floor(intensity * 195);
+            const alpha = 0.15 + intensity * 0.85;
+            html += `<td style="padding: 4px;">
+                <div style="width: 100%; height: 28px; min-width: 32px; border-radius: 4px; background: rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)});"></div>
+            </td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    
+    // Legend
+    html += '<div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.8rem; color: var(--text-muted);">';
+    html += '<span>Less</span>';
+    [0.1, 0.3, 0.5, 0.7, 0.9].forEach(v => {
+        const a = 0.15 + v * 0.85;
+        html += `<div style="width: 20px; height: 14px; border-radius: 3px; background: rgba(0, ${Math.floor(v*229)}, ${Math.floor(v*195)}, ${a.toFixed(2)});"></div>`;
+    });
+    html += '<span>More</span></div>';
+    
+    container.innerHTML = html;
 }
 
 
