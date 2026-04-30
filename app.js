@@ -194,22 +194,52 @@ async function submitCheckIn() {
     const symptoms = [];
     document.querySelectorAll('.symptom-chk:checked').forEach(chk => symptoms.push(chk.value));
     
-    // Calculate client metrics directly
-    let baseBurnout = (stressVal || 5) * 4; 
-    if (workingHours > 10) baseBurnout += 15;
-    if (workingHours > 12) baseBurnout += 20;
-    if (workingDays >= 6) baseBurnout += 15;
-    if (burdenTasks === 'overwhelmed') baseBurnout += 20;
-    else if (burdenTasks === 'heavy') baseBurnout += 10;
-    if (pressureTalk === 'no') baseBurnout += 15;
-    else if (pressureTalk === 'hesitant') baseBurnout += 5;
-    if (Array.isArray(symptoms)) baseBurnout += Math.min(20, symptoms.length * 5);
-
-    const burnoutScore = Math.min(100, Math.max(0, baseBurnout));
+    // Feature 1: Simulate health data for user check-in
+    const heart_rate = Math.floor(60 + Math.random() * 35 + stressVal * 2); // stress elevates HR
+    const sleep_hours = parseFloat(Math.max(3, 9 - stressVal * 0.5 + (Math.random() * 2 - 1)).toFixed(1));
+    const fatigue_level = Math.min(10, Math.max(1, Math.round(stressVal * 0.8 + Math.random() * 2)));
+    const headache_status = symptoms.includes('headaches');
+    
+    // Feature 2: Enhanced burnout calculation (weighted formula)
+    // Work metrics → 50%
+    let workScore = (stressVal || 5) * 6;
+    if (workingHours > 10) workScore += 20;
+    if (workingHours > 12) workScore += 15;
+    if (workingDays >= 6) workScore += 15;
+    if (burdenTasks === 'overwhelmed') workScore += 25;
+    else if (burdenTasks === 'heavy') workScore += 12;
+    if (pressureTalk === 'no') workScore += 10;
+    workScore = Math.min(100, workScore);
+    
+    // Sleep deficiency → 20%
+    let sleepScore = 0;
+    if (sleep_hours < 4) sleepScore = 100;
+    else if (sleep_hours < 5) sleepScore = 80;
+    else if (sleep_hours < 6) sleepScore = 50;
+    else if (sleep_hours < 7) sleepScore = 25;
+    
+    // Heart rate → 15%
+    let heartScore = 0;
+    if (heart_rate > 100) heartScore = 90;
+    else if (heart_rate > 90) heartScore = 50;
+    else if (heart_rate > 85) heartScore = 25;
+    
+    // Headache + fatigue → 15%
+    let healthScore = 0;
+    if (headache_status) healthScore += 40;
+    healthScore += Math.max(0, (fatigue_level - 4) * 10);
+    if (symptoms.length > 0) healthScore += symptoms.length * 8;
+    healthScore = Math.min(100, healthScore);
+    
+    const burnoutScore = Math.min(100, Math.max(0, Math.round(
+        workScore * 0.50 + sleepScore * 0.20 + heartScore * 0.15 + healthScore * 0.15
+    )));
+    
+    // Feature 3: Strict classification
     let burnout = 'Medium';
     let status = 'yellow';
-    if (burnoutScore > 75) { burnout = 'High'; status = 'red'; }
-    else if (burnoutScore < 45) { burnout = 'Low'; status = 'green'; }
+    if (burnoutScore >= 70) { burnout = 'High'; status = 'red'; }
+    else if (burnoutScore < 40) { burnout = 'Low'; status = 'green'; }
 
     let productivity = Math.min(100, Math.max(20, 100 - burnoutScore + Math.floor(Math.random() * 15) - 5));
 
@@ -227,10 +257,35 @@ async function submitCheckIn() {
     else if (metrics.status === 'green') burnoutEl.style.color = 'var(--success)';
     else burnoutEl.style.color = 'var(--warning)';
     
+    // Feature 8: Update personal health summary
+    if (document.getElementById('user-heart-rate')) document.getElementById('user-heart-rate').textContent = heart_rate;
+    if (document.getElementById('user-sleep-hours')) document.getElementById('user-sleep-hours').textContent = sleep_hours;
+    if (document.getElementById('user-fatigue')) document.getElementById('user-fatigue').textContent = fatigue_level;
+    if (document.getElementById('user-headache')) {
+        const headacheEl = document.getElementById('user-headache');
+        headacheEl.textContent = headache_status ? 'Yes' : 'No';
+        headacheEl.style.color = headache_status ? 'var(--danger)' : 'var(--success)';
+    }
+    
+    // Burnout explanation
+    const reasons = [];
+    if (sleep_hours < 5) reasons.push('low sleep');
+    if (heart_rate > 95) reasons.push('elevated heart rate');
+    if (fatigue_level > 7) reasons.push('high fatigue');
+    if (headache_status) reasons.push('headache reported');
+    if (workingHours > 10) reasons.push('excessive work hours');
+    const explanation = reasons.length > 0 
+        ? `${burnout} due to ${reasons.join(' and ')}` 
+        : `${burnout} — within normal parameters`;
+    if (document.getElementById('user-burnout-explanation')) {
+        document.getElementById('user-burnout-explanation').textContent = explanation;
+    }
+    
     // Save state to LocalStorage
     currentUser.productivity = productivity;
     currentUser.burnout = burnout;
     currentUser.status = status;
+    currentUser.healthData = { heart_rate, sleep_hours, working_hours: workingHours, headache_status, fatigue_level, source: 'simulated' };
     localStorage.setItem('mindguard_user', JSON.stringify(currentUser));
     
     // Generate dynamic AI recommendations
@@ -248,12 +303,17 @@ async function submitCheckIn() {
                 "Schedule emergency check-in with direct manager.",
                 "Block focus periods safely."
             ];
+            if (sleep_hours < 5) suggestions.push("⚠️ Sleep critically low — prioritize 7+ hours tonight.");
+            if (heart_rate > 100) suggestions.push("❤️ Heart rate elevated — consider a calming activity.");
         } else if (burnout === 'Low') {
             suggestions = [
                 "Keep up high-performance workflows.",
                 "Optimize learning paths."
             ];
         }
+        if (headache_status) suggestions.push("🤕 Headache reported — stay hydrated and consider a screen break.");
+        if (fatigue_level > 7) suggestions.push("⚡ High fatigue detected — take a power nap or walk.");
+        
         suggestions.forEach(s => {
             const li = document.createElement('li');
             li.textContent = s;
@@ -618,42 +678,162 @@ const NAMES = ["Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Jamie", 
 const DEPTS = ["Sales", "Marketing", "Product", "Design", "Engineering"];
 
 function generateSampleData(quiet = false) {
-    const grid = document.getElementById('heatmap-grid');
-    let criticalCount = 0, highCount = 0, mediumCount = 0, lowCount = 0;
     const employees = [];
+    const totalEmployees = 125;
     
-    for (let i = 1; i <= 125; i++) {
+    for (let i = 1; i <= totalEmployees; i++) {
         const name = NAMES[Math.floor(Math.random() * NAMES.length)] + " " + String.fromCharCode(65 + (i % 26));
         const dept = DEPTS[Math.floor(Math.random() * DEPTS.length)];
-        const burnout = Math.floor(Math.random() * 100);
-        const prod = Math.floor(Math.random() * 60) + 40; 
         
+        // Feature 1: Health & Activity Tracking — realistic simulated values
+        const heart_rate = Math.floor(60 + Math.random() * 50); // 60–110 bpm
+        const sleep_hours = parseFloat((Math.random() * 9 + 3).toFixed(1)); // 3–12 hours
+        const working_hours = parseFloat((Math.random() * 10 + 4).toFixed(1)); // 4–14 hours
+        const headache_status = Math.random() < 0.2; // 20% chance
+        const fatigue_level = Math.floor(Math.random() * 10) + 1; // 1–10
+        
+        // Feature 2: Enhanced Burnout Score (weighted formula)
+        // Work metrics → 50%
+        let workScore = 0;
+        if (working_hours > 10) workScore += 30;
+        else if (working_hours > 8) workScore += 15;
+        workScore += Math.max(0, (fatigue_level - 5) * 5); // fatigue adds to work stress
+        workScore = Math.min(100, workScore);
+        
+        // Sleep deficiency → 20%
+        let sleepScore = 0;
+        if (sleep_hours < 4) sleepScore = 100;
+        else if (sleep_hours < 5) sleepScore = 80;
+        else if (sleep_hours < 6) sleepScore = 50;
+        else if (sleep_hours < 7) sleepScore = 25;
+        
+        // Heart rate abnormality → 15%
+        let heartScore = 0;
+        if (heart_rate > 100) heartScore = 90;
+        else if (heart_rate > 90) heartScore = 50;
+        else if (heart_rate > 85) heartScore = 25;
+        
+        // Headache + fatigue → 15%
+        let healthScore = 0;
+        if (headache_status) healthScore += 40;
+        healthScore += Math.max(0, (fatigue_level - 4) * 10);
+        healthScore = Math.min(100, healthScore);
+        
+        // Final burnout score (0–100)
+        const burnout = Math.min(100, Math.max(0, Math.round(
+            workScore * 0.50 + sleepScore * 0.20 + heartScore * 0.15 + healthScore * 0.15
+        )));
+        
+        const prod = Math.min(100, Math.max(20, 100 - burnout + Math.floor(Math.random() * 15) - 5));
+        
+        // Feature 3: Classification (Low 0-39, Medium 40-69, High 70-100)
         let risk = 'Low';
         let colorClass = 'success';
-        
-        if (burnout > 75) {
-            risk = 'Critical';
-            colorClass = 'danger';
-            criticalCount++;
-        } else if (burnout > 50) {
+        if (burnout >= 70) {
             risk = 'High';
-            colorClass = 'warning';
-            highCount++;
-        } else if (burnout > 25) {
+            colorClass = 'danger';
+        } else if (burnout >= 40) {
             risk = 'Medium';
-            colorClass = 'primary';
-            mediumCount++;
-        } else {
-            lowCount++;
+            colorClass = 'warning';
         }
         
-        employees.push({ name, dept, burnout, prod, risk, colorClass });
+        // Burnout explanation
+        let burnoutExplanation = '';
+        const reasons = [];
+        if (sleep_hours < 5) reasons.push('low sleep');
+        if (heart_rate > 95) reasons.push('elevated heart rate');
+        if (fatigue_level > 7) reasons.push('high fatigue');
+        if (headache_status) reasons.push('headache reported');
+        if (working_hours > 10) reasons.push('excessive work hours');
+        burnoutExplanation = reasons.length > 0 
+            ? `${risk} due to ${reasons.join(' and ')}` 
+            : `${risk} — within normal parameters`;
+        
+        // Integration-ready health data structure (Feature 9)
+        const healthData = {
+            source: 'simulated', // ready for: 'apple_health', 'fitbit', 'google_fit'
+            heart_rate,
+            sleep_hours,
+            working_hours,
+            headache_status,
+            fatigue_level,
+            timestamp: new Date().toISOString()
+        };
+        
+        employees.push({ 
+            name, dept, burnout, prod, risk, colorClass,
+            heart_rate, sleep_hours, working_hours, headache_status, fatigue_level,
+            burnoutExplanation, healthData
+        });
     }
     
-    const simData = { employees, criticalCount, highCount, mediumCount, lowCount };
+    // Feature 4: Strict Distribution Control — High NEVER ≥ 10
+    // Sort by burnout descending for rebalancing
+    employees.sort((a, b) => b.burnout - a.burnout);
+    
+    let highCount = employees.filter(e => e.risk === 'High').length;
+    const MAX_HIGH = 9;
+    
+    // Cap High at 9 — overflow goes to Medium
+    if (highCount > MAX_HIGH) {
+        let demoteCount = highCount - MAX_HIGH;
+        // Demote the lowest-burnout "High" employees to Medium
+        for (let i = employees.length - 1; i >= 0 && demoteCount > 0; i--) {
+            if (employees[i].risk === 'High') {
+                employees[i].risk = 'Medium';
+                employees[i].colorClass = 'warning';
+                employees[i].burnoutExplanation = employees[i].burnoutExplanation.replace('High', 'Medium');
+                demoteCount--;
+            }
+        }
+    }
+    
+    // Ensure at least 1 High if any risk signals exist
+    highCount = employees.filter(e => e.risk === 'High').length;
+    if (highCount === 0) {
+        const candidates = employees.filter(e => e.risk === 'Medium' && e.burnout >= 50);
+        if (candidates.length > 0) {
+            const promote = candidates.slice(0, Math.min(2, candidates.length));
+            promote.forEach(emp => {
+                emp.risk = 'High';
+                emp.colorClass = 'danger';
+            });
+        }
+    }
+    
+    // Recount after rebalancing
+    highCount = employees.filter(e => e.risk === 'High').length;
+    let mediumCount = employees.filter(e => e.risk === 'Medium').length;
+    let lowCount = employees.filter(e => e.risk === 'Low').length;
+    
+    // Feature 5: Data Integrity — ensure total matches
+    const totalCheck = highCount + mediumCount + lowCount;
+    if (totalCheck !== totalEmployees) {
+        console.error(`Distribution mismatch: ${totalCheck} vs ${totalEmployees}`);
+    }
+    
+    // Feature 6: Compute dashboard aggregate stats
+    const avgSleep = (employees.reduce((s, e) => s + e.sleep_hours, 0) / totalEmployees).toFixed(1);
+    const avgHeartRate = Math.round(employees.reduce((s, e) => s + e.heart_rate, 0) / totalEmployees);
+    const avgFatigue = (employees.reduce((s, e) => s + e.fatigue_level, 0) / totalEmployees).toFixed(1);
+    
+    // Feature 7: Smart Alerts
+    const smartAlerts = [];
+    employees.forEach(emp => {
+        if (emp.sleep_hours < 5) smartAlerts.push({ type: 'danger', msg: `${emp.name}: Sleep critically low (${emp.sleep_hours}h)` });
+        if (emp.heart_rate > 100) smartAlerts.push({ type: 'danger', msg: `${emp.name}: Heart rate elevated (${emp.heart_rate} bpm) during work` });
+        if (emp.fatigue_level > 8) smartAlerts.push({ type: 'warning', msg: `${emp.name}: Fatigue level critical (${emp.fatigue_level}/10)` });
+        if (emp.headache_status) smartAlerts.push({ type: 'warning', msg: `${emp.name}: Headache reported — monitor for consecutive pattern` });
+    });
+    
+    const simData = { 
+        employees, highCount, mediumCount, lowCount, 
+        totalEmployees, avgSleep, avgHeartRate, avgFatigue,
+        smartAlerts
+    };
     localStorage.setItem('mindguard_sim_data', JSON.stringify(simData));
     
-    if (!quiet) alert('Successfully generated diagnostic protocols for 125 behavioral clusters!');
+    if (!quiet) alert(`✅ Generated health-enhanced data for ${totalEmployees} employees!\n\nDistribution: Low(${lowCount}) Medium(${mediumCount}) High(${highCount})\nTotal: ${lowCount + mediumCount + highCount}\nHigh burnout capped at max 9 ✓`);
     loadSimulatedData();
 }
 
@@ -665,7 +845,8 @@ function loadSimulatedData() {
     }
     
     try {
-        const { employees, criticalCount, highCount, mediumCount, lowCount } = JSON.parse(saved);
+        const data = JSON.parse(saved);
+        const { employees, highCount, mediumCount, lowCount, totalEmployees, avgSleep, avgHeartRate, avgFatigue, smartAlerts } = data;
         const grid = document.getElementById('heatmap-grid');
         const tbody = document.getElementById('team-table-body');
         const alerts = document.getElementById('team-alerts');
@@ -675,6 +856,7 @@ function loadSimulatedData() {
         if (alerts) alerts.innerHTML = '';
         
         employees.forEach(emp => {
+            // Heatmap cards with health data
             if (grid) {
                 const card = document.createElement('div');
                 card.className = `glass-card glass`;
@@ -692,6 +874,13 @@ function loadSimulatedData() {
                         <div>Burnout: <strong style="color: var(--${emp.colorClass});">${emp.burnout}</strong></div>
                         <div>Prod: <strong style="color: var(--primary);">${emp.prod}%</strong></div>
                     </div>
+                    <div style="margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.75rem; color: var(--text-muted);">
+                        <div>❤️ ${emp.heart_rate || '--'} bpm</div>
+                        <div>😴 ${emp.sleep_hours || '--'}h sleep</div>
+                        <div>⚡ Fatigue: ${emp.fatigue_level || '--'}/10</div>
+                        <div>🕐 ${emp.working_hours || '--'}h work</div>
+                    </div>
+                    ${emp.headache_status ? '<div style="margin-top: 6px; font-size: 0.75rem; color: var(--danger);">🤕 Headache reported</div>' : ''}
                     <div style="margin-top: 8px; font-size: 0.8rem; text-transform: uppercase; color: var(--${emp.colorClass}); font-weight: bold;">
                         ${emp.risk} Risk
                     </div>
@@ -699,7 +888,8 @@ function loadSimulatedData() {
                 grid.appendChild(card);
             }
             
-            if (tbody && (emp.risk === 'Critical' || emp.risk === 'High' || emp.risk === 'Medium')) {
+            // Team table — High and Medium risk employees
+            if (tbody && (emp.risk === 'High' || emp.risk === 'Medium')) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${emp.name}</td>
@@ -707,7 +897,7 @@ function loadSimulatedData() {
                     <td style="color: var(--${emp.colorClass}); font-weight:bold;">${emp.risk}</td>
                     <td><span class="status-dot dot-${emp.colorClass === 'danger' ? 'red' : 'yellow'}"></span></td>
                     <td>
-                        ${emp.risk === 'High' || emp.risk === 'Critical' ? 
+                        ${emp.risk === 'High' ? 
                             `<button class="btn btn-danger" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; cursor:pointer;" onclick="offerBurnoutChoices('${emp.name}', '${emp.prod}')">Intervene</button>` : 
                             `<button class="btn btn-warning" style="padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; cursor:pointer; color:#000;" onclick="offerMediumChoices('${emp.name}', '${emp.prod}')">Support</button>`
                         }
@@ -716,21 +906,45 @@ function loadSimulatedData() {
                 tbody.appendChild(tr);
             }
             
-            if (alerts && (emp.risk === 'Critical' || emp.risk === 'High')) {
+            // High risk alerts
+            if (alerts && emp.risk === 'High') {
                 const alertItem = document.createElement('li');
                 alertItem.style.borderLeft = `4px solid var(--${emp.colorClass})`;
                 alertItem.style.padding = '8px';
                 alertItem.style.marginBottom = '8px';
-                alertItem.innerHTML = `<strong>${emp.name}</strong> (${emp.dept}): Burnout index at ${emp.burnout}. Action requested.`;
+                alertItem.innerHTML = `<strong>${emp.name}</strong> (${emp.dept}): Burnout index at ${emp.burnout}. ${emp.burnoutExplanation || 'Action requested.'}`;
                 alerts.appendChild(alertItem);
             }
         });
         
-        if (document.getElementById('total-alerts-count')) document.getElementById('total-alerts-count').textContent = criticalCount + highCount + mediumCount;
-        if (document.getElementById('critical-alerts')) document.getElementById('critical-alerts').textContent = criticalCount;
-        if (document.getElementById('high-alerts')) document.getElementById('high-alerts').textContent = highCount;
-        if (document.getElementById('medium-alerts')) document.getElementById('medium-alerts').textContent = mediumCount;
-        if (document.getElementById('low-alerts')) document.getElementById('low-alerts').textContent = lowCount;
+        // Update alert counters
+        if (document.getElementById('total-alerts-count')) document.getElementById('total-alerts-count').textContent = highCount + mediumCount;
+        if (document.getElementById('critical-alerts')) document.getElementById('critical-alerts').textContent = highCount;
+        if (document.getElementById('high-alerts')) document.getElementById('high-alerts').textContent = mediumCount;
+        if (document.getElementById('medium-alerts')) document.getElementById('medium-alerts').textContent = lowCount;
+        if (document.getElementById('low-alerts')) document.getElementById('low-alerts').textContent = 0;
+        
+        // Feature 6: Dashboard KPIs — populate new health summary cards
+        if (document.getElementById('dash-total-employees')) document.getElementById('dash-total-employees').textContent = totalEmployees || employees.length;
+        if (document.getElementById('dash-high-count')) document.getElementById('dash-high-count').textContent = highCount || 0;
+        if (document.getElementById('dash-medium-count')) document.getElementById('dash-medium-count').textContent = mediumCount || 0;
+        if (document.getElementById('dash-low-count')) document.getElementById('dash-low-count').textContent = lowCount || 0;
+        if (document.getElementById('dash-avg-sleep')) document.getElementById('dash-avg-sleep').textContent = avgSleep || '--';
+        if (document.getElementById('dash-avg-heartrate')) document.getElementById('dash-avg-heartrate').textContent = avgHeartRate || '--';
+        if (document.getElementById('dash-avg-fatigue')) document.getElementById('dash-avg-fatigue').textContent = avgFatigue || '--';
+        if (document.getElementById('dash-alerts-count')) document.getElementById('dash-alerts-count').textContent = highCount || 0;
+        
+        // Feature 7: Smart Alerts rendering
+        const smartAlertsList = document.getElementById('smart-alerts-list');
+        if (smartAlertsList && smartAlerts && smartAlerts.length > 0) {
+            smartAlertsList.innerHTML = '';
+            smartAlerts.slice(0, 15).forEach(sa => {
+                const li = document.createElement('li');
+                li.style.borderLeftColor = sa.type === 'danger' ? 'var(--danger)' : 'var(--warning)';
+                li.innerHTML = `${sa.type === 'danger' ? '🚨' : '⚠️'} ${sa.msg}`;
+                smartAlertsList.appendChild(li);
+            });
+        }
     } catch (e) {
         console.error("Failed to parse simulation logs", e);
     }

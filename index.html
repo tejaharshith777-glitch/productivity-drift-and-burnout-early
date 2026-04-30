@@ -171,6 +171,40 @@
                             </div>
                         </div>
 
+                        <!-- Feature 8: Personal Health Summary -->
+                        <div class="glass-card glass" style="margin-bottom: 24px; border-color: #8b5cf6;">
+                            <h3>🩺 Personal Health Summary</h3>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-top: 16px;">
+                                <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                    <div style="font-size: 1.8rem;">❤️</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: #ef4444;" id="user-heart-rate">72</div>
+                                    <div style="color: var(--text-muted); font-size: 0.8rem;">Heart Rate (bpm)</div>
+                                </div>
+                                <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                    <div style="font-size: 1.8rem;">😴</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;" id="user-sleep-hours">7.2</div>
+                                    <div style="color: var(--text-muted); font-size: 0.8rem;">Sleep Hours</div>
+                                </div>
+                                <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                    <div style="font-size: 1.8rem;">⚡</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;" id="user-fatigue">3</div>
+                                    <div style="color: var(--text-muted); font-size: 0.8rem;">Fatigue (1-10)</div>
+                                </div>
+                                <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                    <div style="font-size: 1.8rem;">🤕</div>
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="user-headache">No</div>
+                                    <div style="color: var(--text-muted); font-size: 0.8rem;">Headache</div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 4px solid var(--primary);">
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Burnout Assessment</div>
+                                <div style="font-weight: 600; margin-top: 4px;" id="user-burnout-explanation">Low — within normal parameters</div>
+                            </div>
+                            <div style="margin-top: 12px; font-size: 0.75rem; color: var(--text-muted);">
+                                📱 Data source: <span style="color: var(--primary);">Simulated</span> — Integration ready for Apple Health, Fitbit, Google Fit
+                            </div>
+                        </div>
+
                         <div class="glass-card glass" style="margin-bottom: 24px;">
                             <h3>Weekly Productivity Trends</h3>
                             <div style="position: relative; height: 300px; width: 100%;">
@@ -255,6 +289,51 @@
                     <section id="team-dashboard" class="screen">
                         <h1 style="margin-bottom: 24px;">Team Overview</h1>
                         
+                        <!-- Feature 6: Dashboard Health KPIs -->
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: var(--primary);" id="dash-total-employees">125</div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Total Employees</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: var(--danger);" id="dash-high-count">0</div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">High Burnout</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: var(--warning);" id="dash-medium-count">0</div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Medium Burnout</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: var(--success);" id="dash-low-count">0</div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Low Burnout</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: #8b5cf6;"><span id="dash-avg-sleep">--</span>h</div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Avg Sleep</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: #ef4444;"><span id="dash-avg-heartrate">--</span></div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Avg Heart Rate</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: #f59e0b;"><span id="dash-avg-fatigue">--</span></div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Avg Fatigue</div>
+                            </div>
+                            <div class="glass-card glass" style="text-align: center; padding: 16px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: var(--danger);" id="dash-alerts-count">0</div>
+                                <div style="color: var(--text-muted); font-size: 0.85rem;">Alerts</div>
+                            </div>
+                        </div>
+
+                        <!-- Feature 7: Smart Health Alerts -->
+                        <div class="glass-card glass" style="margin-bottom: 24px; border-color: var(--warning);">
+                            <h3>🔔 Smart Health Alerts</h3>
+                            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 12px;">Auto-triggered when: sleep &lt; 5h, heart rate &gt; 100 bpm, fatigue &gt; 8, or headache reported</p>
+                            <ul class="suggestions-list" id="smart-alerts-list" style="max-height: 200px; overflow-y: auto;">
+                                <li style="color: var(--text-muted);">Generate sample data to see alerts</li>
+                            </ul>
+                        </div>
+
                         <div class="glass-card glass table-responsive" style="margin-bottom: 24px;">
                             <h3>Team Health & Performance</h3>
                             <table>
