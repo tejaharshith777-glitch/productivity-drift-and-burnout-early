@@ -829,7 +829,9 @@
                                             <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="autoBalanceTasks()">🤖 Auto Balance</button>
                                         </div>
                                     </div>
-                                    <div id="rebalance-target-name" style="font-weight: 600; color: var(--primary); margin-bottom: 12px;">Select an employee</div>
+                                    <select id="rebalance-target-select" onchange="selectRebalanceTarget(this.value)" style="width: 100%; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); margin-bottom: 12px; font-weight: 600;">
+                                        <option value="">-- Select an employee to view tasks --</option>
+                                    </select>
                                     <div id="pending-tasks-list">
                                         <div style="text-align: center; color: var(--text-muted); padding: 20px;">Select an at-risk employee to view and reassign their pending tasks.</div>
                                     </div>

@@ -1851,6 +1851,14 @@ function renderTaskRebalancer() {
 
     document.getElementById('at-risk-workloads').innerHTML = listHtml || '<div style="color: var(--success); padding: 20px; text-align: center;">No critical work gaps detected.</div>';
     
+    // Populate dropdown
+    const select = document.getElementById('rebalance-target-select');
+    if (select) {
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- Select an employee to view tasks --</option>' + emps.map(e => `<option value="${e.id}">${e.name} (${e.dept})</option>`).join('');
+        if (currentVal && emps.find(e => e.id === currentVal)) select.value = currentVal;
+    }
+
     // Update metrics
     document.getElementById('metric-recovery-score').textContent = `${taskRecoveryMetrics.score}%`;
     document.getElementById('metric-reassigned-count').textContent = taskRecoveryMetrics.reassigned;
@@ -1860,12 +1868,18 @@ let currentRebalanceTarget = null;
 let currentTaskId = null;
 
 function selectRebalanceTarget(empId) {
+    if (!empId) {
+        document.getElementById('pending-tasks-list').innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Select an employee to view and reassign their pending tasks.</div>';
+        currentRebalanceTarget = null;
+        return;
+    }
     currentRebalanceTarget = empId;
     const emps = getAllEmployees();
     const emp = emps.find(e => e.id === empId);
     if (!emp) return;
 
-    document.getElementById('rebalance-target-name').textContent = `Tasks for ${emp.name}`;
+    const select = document.getElementById('rebalance-target-select');
+    if (select && select.value !== emp.id) select.value = emp.id;
     
     const tasks = getEmployeeTasks(emp.id, emp.dept);
     const listHtml = tasks.map(t => {
