@@ -1692,7 +1692,44 @@ function getAllEmployees() {
         outputQuality: e.outputQuality || Math.floor(60 + Math.random() * 35),
         status: (e.burnout >= 65 ? 'Critical' : e.burnout >= 40 ? 'Drifting' : 'Stable')
     }));
-    return [...simEmps, ...managedEmployees.map(e => ({...e, source: 'manual'}))];
+    let emps = [...simEmps, ...managedEmployees.map(e => ({...e, source: 'manual'}))];
+    
+    // Assign skills dynamically based on department
+    const deptSkills = {
+        'Engineering': ['Frontend', 'Backend', 'DevOps', 'Architecture'],
+        'Marketing': ['SEO', 'Content', 'Social Media', 'Analytics'],
+        'Design': ['UI', 'UX', 'Research', 'Illustration'],
+        'Sales': ['B2B', 'Lead Gen', 'Closing', 'CRM'],
+        'HR': ['Recruiting', 'Onboarding', 'Compliance', 'Relations']
+    };
+    
+    emps = emps.map(e => {
+        if (!e.skills) {
+            const possible = deptSkills[e.dept] || ['General'];
+            // Assign 1-3 random skills deterministically based on name length
+            e.skills = possible.slice(0, 1 + (e.name.length % possible.length));
+        }
+        return e;
+    });
+    
+    // Dynamically calculate workload and burnout based on currently assigned tasks
+    let tasksDB = JSON.parse(localStorage.getItem('mindguard_employee_tasks') || '{}');
+    emps.forEach(e => {
+        if (tasksDB[e.id]) {
+            const totalHours = tasksDB[e.id].reduce((sum, t) => sum + (t.status === 'completed' ? 0 : t.hours), 0);
+            e.working_hours = parseFloat((totalHours / 5).toFixed(1)); // Average daily hours from total task load
+            
+            // Adjust burnout score deterministically based on workload
+            const baseBurnout = e.burnout || 30; // base fallback
+            let calculatedBurnout = baseBurnout + (e.working_hours > 8 ? (e.working_hours - 8) * 5 : 0) - (e.sleep_hours < 6 ? (6 - e.sleep_hours) * 5 : 0);
+            e.burnout = Math.min(100, Math.max(0, Math.floor(calculatedBurnout)));
+            
+            e.risk = e.burnout >= 70 ? 'High' : e.burnout >= 40 ? 'Medium' : 'Low';
+            e.status = e.burnout >= 65 ? 'Critical' : e.burnout >= 40 ? 'Drifting' : 'Stable';
+        }
+    });
+
+    return emps;
 }
 
 function renderEmployeeRoster() {
@@ -1759,6 +1796,15 @@ function getEmployeeTasks(empId, dept) {
         // Generate simulated tasks
         const numTasks = Math.floor(3 + Math.random() * 5);
         tasksDB[empId] = [];
+        const deptSkills = {
+            'Engineering': ['Frontend', 'Backend', 'DevOps', 'Architecture'],
+            'Marketing': ['SEO', 'Content', 'Social Media', 'Analytics'],
+            'Design': ['UI', 'UX', 'Research', 'Illustration'],
+            'Sales': ['B2B', 'Lead Gen', 'Closing', 'CRM'],
+            'HR': ['Recruiting', 'Onboarding', 'Compliance', 'Relations']
+        };
+        const possibleSkills = deptSkills[dept] || ['General'];
+
         for (let i = 0; i < numTasks; i++) {
             const isPriority = Math.random() > 0.6;
             const status = Math.random() > 0.7 ? (Math.random() > 0.5 ? 'blocked' : 'delayed') : 'pending';
@@ -1768,7 +1814,8 @@ function getEmployeeTasks(empId, dept) {
                 priority: isPriority ? 'High' : 'Normal',
                 status: status,
                 hours: Math.floor(2 + Math.random() * 6),
-                deadline: new Date(Date.now() + (Math.random() * 7 - 2) * 86400000).toLocaleDateString()
+                deadline: new Date(Date.now() + (Math.random() * 7 - 2) * 86400000).toLocaleDateString(),
+                required_skill: possibleSkills[i % possibleSkills.length]
             });
         }
         localStorage.setItem('mindguard_employee_tasks', JSON.stringify(tasksDB));
@@ -1829,7 +1876,7 @@ function selectRebalanceTarget(empId) {
                 <div style="font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid ${statusColor}; color: ${statusColor};">${t.status.toUpperCase()}</div>
             </div>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Priority: ${t.priority} · Est. ${t.hours}h · Due: ${t.deadline}</div>
-            <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="suggestReassignment('${emp.id}', '${t.id}')">Suggest Reassignment</button>
+            <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="openReassignModal('${emp.id}', '${t.id}')">Suggest Reassignment</button>
         </div>`;
     }).join('');
 
@@ -1837,73 +1884,176 @@ function selectRebalanceTarget(empId) {
     document.getElementById('impact-awareness-panel').style.display = 'none';
 }
 
-function suggestReassignment(sourceEmpId, taskId) {
+let undoStack = [];
+
+function openReassignModal(sourceEmpId, taskId) {
+    currentRebalanceTarget = sourceEmpId;
+    currentTaskId = taskId;
+    
+    document.getElementById('reassign-employee-modal').style.display = 'flex';
+    document.getElementById('reassign-search').value = '';
+    
     const emps = getAllEmployees();
     const sourceEmp = emps.find(e => e.id === sourceEmpId);
-    const tasks = getEmployeeTasks(sourceEmpId, sourceEmp.dept);
-    const task = tasks.find(t => t.id === taskId);
-    if (!sourceEmp || !task) return;
-
-    currentTaskId = taskId;
-
-    // Filter available employees: same dept, burnout < 50, working_hours < 8
-    const candidates = emps.filter(e => e.id !== sourceEmpId && e.dept === sourceEmp.dept && e.burnout < 50 && e.working_hours < 8);
-    candidates.sort((a, b) => a.burnout - b.burnout); // Sort by lowest burnout
-
-    const panel = document.getElementById('impact-awareness-panel');
-    const details = document.getElementById('impact-details');
-
-    if (candidates.length === 0) {
-        details.innerHTML = `<div style="color: var(--danger); font-weight: 600;">No suitable candidates found in ${sourceEmp.dept}.</div>
-        <p style="color: var(--text-muted); font-size: 0.8rem;">All team members are either at high burnout risk or over capacity (>8h/day). Cross-department reassignment or deadline extension required.</p>`;
-        document.getElementById('btn-confirm-reassign').style.display = 'none';
-    } else {
-        const top = candidates[0];
-        const newHours = (top.working_hours + (task.hours / 5)).toFixed(1); // Spread task hours over a week roughly
-        const newRisk = newHours > 8 ? 'Medium' : top.risk;
-        
-        details.innerHTML = `
-            <div style="margin-bottom: 12px;"><strong>Suggested Assignee:</strong> ${top.name} (Burnout: ${top.burnout}, ${top.working_hours}h/day)</div>
-            <div style="margin-bottom: 8px;"><strong>Simulated Impact on ${top.name}:</strong></div>
-            <ul style="color: var(--text-muted); margin: 0; padding-left: 20px;">
-                <li>Workload: ${top.working_hours}h ➔ <span style="color: var(--warning);">${newHours}h</span></li>
-                <li>Burnout Risk: ${top.risk} ➔ <span style="color: ${newRisk === 'Medium' ? 'var(--warning)' : 'var(--success)'};">${newRisk}</span></li>
-            </ul>
-        `;
-        const btn = document.getElementById('btn-confirm-reassign');
-        btn.style.display = 'block';
-        btn.onclick = () => executeReassignment(sourceEmpId, top.id, taskId);
-    }
     
-    panel.style.display = 'block';
+    const deptFilter = document.getElementById('reassign-filter-dept');
+    const depts = [...new Set(emps.map(e => e.dept))];
+    deptFilter.innerHTML = `<option value="all">All Departments</option>` + depts.map(d => `<option value="${d}" ${d === sourceEmp.dept ? 'selected' : ''}>${d}</option>`).join('');
+    
+    renderReassignCandidates();
 }
 
-function executeReassignment(sourceEmpId, targetEmpId, taskId) {
+function renderReassignCandidates() {
     const emps = getAllEmployees();
-    const sourceEmp = emps.find(e => e.id === sourceEmpId);
-    let tasks = getEmployeeTasks(sourceEmpId, sourceEmp.dept);
-    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    const sourceEmp = emps.find(e => e.id === currentRebalanceTarget);
+    const tasks = getEmployeeTasks(currentRebalanceTarget, sourceEmp.dept);
+    const task = tasks.find(t => t.id === currentTaskId);
+    
+    const search = document.getElementById('reassign-search').value.toLowerCase();
+    const dept = document.getElementById('reassign-filter-dept').value;
+    
+    let candidates = emps.filter(e => e.id !== currentRebalanceTarget);
+    if (dept !== 'all') candidates = candidates.filter(e => e.dept === dept);
+    if (search) candidates = candidates.filter(e => e.name.toLowerCase().includes(search) || (e.skills||[]).some(s => s.toLowerCase().includes(search)));
+    
+    // Sort logic: Calculate Match Score
+    candidates = candidates.map(c => {
+        const skillMatch = (c.skills||[]).includes(task.required_skill) ? 100 : 0;
+        const workloadScore = c.working_hours < 5 ? 100 : c.working_hours < 8 ? 50 : 0;
+        const burnoutScore = c.burnout < 40 ? 100 : c.burnout < 60 ? 50 : 0;
+        const totalScore = (skillMatch * 0.5) + (workloadScore * 0.3) + (burnoutScore * 0.2);
+        return { ...c, totalScore, skillMatch };
+    }).sort((a, b) => b.totalScore - a.totalScore);
+
+    const list = document.getElementById('reassign-candidates-list');
+    if (candidates.length === 0) {
+        list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">No candidates found matching criteria.</div>';
+        return;
+    }
+    
+    list.innerHTML = candidates.map(c => {
+        const newHours = (c.working_hours + (task.hours / 5)).toFixed(1);
+        const reason = `Workload remains safe (${newHours}h), Skill match: ${c.skillMatch}%`;
+        return `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--glass-border); padding: 12px; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600;">${c.name} <span style="font-size: 0.75rem; color: var(--text-muted);">(${c.dept})</span></div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                        Workload: <span style="color: ${c.working_hours >= 8 ? 'var(--danger)' : 'var(--success)'};">${c.working_hours}h</span> | 
+                        Burnout: <span style="color: ${c.burnout >= 65 ? 'var(--danger)' : c.burnout >= 40 ? 'var(--warning)' : 'var(--success)'};">${c.burnout}</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--primary); margin-top: 4px;">🎯 Match Score: ${Math.round(c.totalScore)}% — ${reason}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Skills: ${(c.skills||[]).join(', ')}</div>
+                </div>
+                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="confirmReassign('${currentRebalanceTarget}', '${c.id}', '${currentTaskId}')">Assign</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function confirmReassign(sourceEmpId, targetEmpId, taskId) {
+    const emps = getAllEmployees();
+    let sourceTasks = getEmployeeTasks(sourceEmpId, '');
+    let targetTasks = getEmployeeTasks(targetEmpId, '');
+    
+    const taskIndex = sourceTasks.findIndex(t => t.id === taskId);
     if (taskIndex === -1) return;
     
-    const task = tasks.splice(taskIndex, 1)[0];
-    updateEmployeeTasks(sourceEmpId, tasks);
+    const task = sourceTasks.splice(taskIndex, 1)[0];
     
-    const targetEmp = emps.find(e => e.id === targetEmpId);
-    let targetTasks = getEmployeeTasks(targetEmpId, targetEmp.dept);
+    // Save to undo stack
+    undoStack.push({ sourceEmpId, targetEmpId, task });
+    
     targetTasks.push(task);
+    
+    updateEmployeeTasks(sourceEmpId, sourceTasks);
     updateEmployeeTasks(targetEmpId, targetTasks);
 
-    // Update metrics
     taskRecoveryMetrics.reassigned += 1;
-    taskRecoveryMetrics.score = Math.min(100, taskRecoveryMetrics.score + Math.floor(5 + Math.random() * 10));
+    taskRecoveryMetrics.score = Math.min(100, taskRecoveryMetrics.score + 5);
     if (taskRecoveryMetrics.score === 0) taskRecoveryMetrics.score = 85;
     localStorage.setItem('mindguard_task_metrics', JSON.stringify(taskRecoveryMetrics));
 
-    document.getElementById('impact-awareness-panel').style.display = 'none';
-    selectRebalanceTarget(sourceEmpId);
-    renderTaskRebalancer();
+    document.getElementById('reassign-employee-modal').style.display = 'none';
     
-    alert(`✅ Task "${task.title}" successfully reassigned from ${sourceEmp.name} to ${targetEmp.name}.`);
+    // Recalculate everything deterministically
+    generateSystemAlerts();
+    renderTaskRebalancer();
+    selectRebalanceTarget(sourceEmpId);
+    
+    alert(`✅ Task successfully reassigned! System metrics updated.`);
+}
+
+function undoLastRebalance() {
+    if (undoStack.length === 0) {
+        alert("No recent reassignments to undo.");
+        return;
+    }
+    const last = undoStack.pop();
+    let sourceTasks = getEmployeeTasks(last.sourceEmpId, '');
+    let targetTasks = getEmployeeTasks(last.targetEmpId, '');
+    
+    const targetIndex = targetTasks.findIndex(t => t.id === last.task.id);
+    if (targetIndex > -1) {
+        targetTasks.splice(targetIndex, 1);
+        sourceTasks.push(last.task);
+        updateEmployeeTasks(last.sourceEmpId, sourceTasks);
+        updateEmployeeTasks(last.targetEmpId, targetTasks);
+        
+        taskRecoveryMetrics.reassigned = Math.max(0, taskRecoveryMetrics.reassigned - 1);
+        localStorage.setItem('mindguard_task_metrics', JSON.stringify(taskRecoveryMetrics));
+        
+        generateSystemAlerts();
+        renderTaskRebalancer();
+        if (currentRebalanceTarget) selectRebalanceTarget(currentRebalanceTarget);
+        
+        alert("↩️ Last reassignment undone successfully.");
+    }
+}
+
+function autoBalanceTasks() {
+    const emps = getAllEmployees();
+    const atRisk = emps.filter(e => e.burnout >= 60);
+    let balancedCount = 0;
+    
+    atRisk.forEach(sourceEmp => {
+        let tasks = getEmployeeTasks(sourceEmp.id, sourceEmp.dept);
+        const criticalTasks = tasks.filter(t => t.priority === 'High' || t.status === 'delayed' || t.status === 'blocked');
+        
+        criticalTasks.forEach(task => {
+            // Find best candidate
+            const candidates = emps.filter(e => e.id !== sourceEmp.id && e.dept === sourceEmp.dept && e.burnout < 50 && e.working_hours < 7 && (e.skills||[]).includes(task.required_skill));
+            candidates.sort((a, b) => a.working_hours - b.working_hours);
+            
+            if (candidates.length > 0) {
+                const targetEmp = candidates[0];
+                const taskIndex = tasks.findIndex(t => t.id === task.id);
+                tasks.splice(taskIndex, 1);
+                updateEmployeeTasks(sourceEmp.id, tasks);
+                
+                let targetTasks = getEmployeeTasks(targetEmp.id, targetEmp.dept);
+                targetTasks.push(task);
+                updateEmployeeTasks(targetEmp.id, targetTasks);
+                
+                undoStack.push({ sourceEmpId: sourceEmp.id, targetEmpId: targetEmp.id, task });
+                targetEmp.working_hours += (task.hours/5); // update local candidate state for next loop
+                balancedCount++;
+            }
+        });
+    });
+    
+    if (balancedCount > 0) {
+        taskRecoveryMetrics.reassigned += balancedCount;
+        taskRecoveryMetrics.score = Math.min(100, taskRecoveryMetrics.score + (balancedCount * 5));
+        localStorage.setItem('mindguard_task_metrics', JSON.stringify(taskRecoveryMetrics));
+        generateSystemAlerts();
+        renderTaskRebalancer();
+        if (currentRebalanceTarget) selectRebalanceTarget(currentRebalanceTarget);
+        alert(`🤖 Auto-balanced ${balancedCount} tasks optimally across teams!`);
+    } else {
+        alert("No tasks could be safely auto-balanced. Manual intervention or cross-department reassignment required.");
+    }
 }
 
 // ===== ALERT CENTER ENGINE =====
@@ -1911,51 +2061,60 @@ let systemAlerts = [];
 
 function generateSystemAlerts() {
     systemAlerts = [];
-    const emps = getAllEmployees();
+    const emps = getAllEmployees(); // This now dynamically calculates workload and burnout
     const now = new Date();
-    const cats = ['burnout', 'drift', 'behavior', 'system'];
-    const depts = ['Engineering', 'Marketing', 'Sales', 'Design', 'HR'];
-    const seenKeys = new Set();
+    // Deterministic timestamp anchor
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    emps.forEach(e => {
+    emps.forEach((e, i) => {
+        // Base timestamp on employee index to avoid random
+        const tsOffset = i * 360000; 
+
         // Burnout alerts
         if (e.burnout >= 70) {
-            const k = `burnout_high_${e.name}`;
-            if (!seenKeys.has(k)) { seenKeys.add(k); systemAlerts.push({ severity: 'critical', category: 'burnout', employee: e.name, dept: e.dept, desc: `Burnout score at ${e.burnout} — immediate intervention needed`, rootCause: `Sustained overwork (${e.working_hours}h/day) + low sleep (${e.sleep_hours}h)`, action: 'Reduce workload, schedule 1:1 check-in', ts: new Date(now - Math.random()*3600000) }); }
+            systemAlerts.push({ severity: 'critical', category: 'burnout', employee: e.name, dept: e.dept, desc: `Critical burnout score (${e.burnout}) due to ${e.working_hours}h/day workload`, rootCause: `Sustained overwork limits exceeded. Recovery hindered by sleep deficit.`, action: 'Mandatory Task Rebalance', ts: new Date(today - tsOffset) });
         } else if (e.burnout >= 50) {
-            const k = `burnout_med_${e.name}`;
-            if (!seenKeys.has(k)) { seenKeys.add(k); systemAlerts.push({ severity: 'high', category: 'burnout', employee: e.name, dept: e.dept, desc: `Burnout score rising to ${e.burnout}`, rootCause: `Fatigue level ${e.fatigue_level}/10, irregular patterns`, action: 'Monitor closely, suggest break', ts: new Date(now - Math.random()*7200000) }); }
+            systemAlerts.push({ severity: 'high', category: 'burnout', employee: e.name, dept: e.dept, desc: `Burnout score rising to ${e.burnout}`, rootCause: `High workload (${e.working_hours}h/day) and elevated fatigue`, action: 'Review workload and suggest break', ts: new Date(today - tsOffset - 7200000) });
         }
-        // Drift alerts
-        if (e.productivity < 50) {
-            systemAlerts.push({ severity: 'medium', category: 'drift', employee: e.name, dept: e.dept, desc: `Productivity at ${e.productivity}% — below baseline`, rootCause: 'Possible disengagement or task mismatch', action: 'Review task assignments', ts: new Date(now - Math.random()*14400000) });
+        
+        // Drift alerts (Deterministic)
+        if (e.taskCompletion < 60 && e.burnout < 50) {
+            systemAlerts.push({ severity: 'medium', category: 'drift', employee: e.name, dept: e.dept, desc: `Task completion at ${e.taskCompletion}%`, rootCause: 'Possible task mismatch or disengagement', action: 'Review task assignments', ts: new Date(today - tsOffset - 14400000) });
         }
-        // Behavior alerts
-        if (e.reworkFreq > 18) {
-            systemAlerts.push({ severity: 'medium', category: 'behavior', employee: e.name, dept: e.dept, desc: `Rework frequency at ${e.reworkFreq}%`, rootCause: 'Unclear requirements or skill gap', action: 'Pair with senior, clarify specs', ts: new Date(now - Math.random()*21600000) });
+        
+        // Behavior alerts (Deterministic)
+        if (e.reworkFreq > 15) {
+            systemAlerts.push({ severity: 'medium', category: 'behavior', employee: e.name, dept: e.dept, desc: `Rework frequency at ${e.reworkFreq}%`, rootCause: 'Unclear requirements or skill gap', action: 'Pair with senior', ts: new Date(today - tsOffset - 21600000) });
         }
-        if (e.sleep_hours < 4.5) {
-            systemAlerts.push({ severity: 'high', category: 'burnout', employee: e.name, dept: e.dept, desc: `Sleep critically low at ${e.sleep_hours}h`, rootCause: 'Possible chronic sleep deprivation', action: 'Flag for wellness check', ts: new Date(now - Math.random()*7200000) });
-        }
+        
         // Work Continuity Risk (Gap Detection)
         if (e.burnout >= 50) {
             const tasks = getEmployeeTasks(e.id, e.dept) || [];
             const criticalTasks = tasks.filter(t => t.priority === 'High' || t.status === 'delayed' || t.status === 'blocked');
             if (criticalTasks.length > 0) {
-                const k = `work_gap_${e.id}`;
-                if (!seenKeys.has(k)) { 
-                    seenKeys.add(k); 
-                    systemAlerts.push({ 
-                        severity: e.burnout >= 70 ? 'critical' : 'high', 
-                        category: 'continuity', 
-                        employee: e.name, 
-                        dept: e.dept, 
-                        desc: `${criticalTasks.length} critical/delayed tasks at risk due to burnout`, 
-                        rootCause: `Employee is at ${e.burnout >= 70 ? 'critical' : 'high'} burnout risk with pending high-priority work`, 
-                        action: 'Use Task Rebalancer to redistribute workload', 
-                        ts: new Date(now - Math.random()*1800000) 
-                    }); 
-                }
+                systemAlerts.push({ 
+                    severity: e.burnout >= 70 ? 'critical' : 'high', 
+                    category: 'continuity', 
+                    employee: e.name, 
+                    dept: e.dept, 
+                    desc: `${criticalTasks.length} critical/delayed tasks at risk`, 
+                    rootCause: `Employee is overloaded. If no action taken, risk of deadline failure increases in 24h.`, 
+                    action: 'Use Task Rebalancer', 
+                    ts: new Date(today - tsOffset - 1800000) 
+                }); 
+            }
+        }
+    });
+
+    // Enforce balance: critical+high in single digits deterministically based on list
+    systemAlerts.sort((a, b) => b.ts - a.ts);
+    
+    let highCritCount = 0;
+    systemAlerts.forEach(a => {
+        if (a.severity === 'critical' || a.severity === 'high') {
+            highCritCount++;
+            if (highCritCount > 9) {
+                a.severity = 'medium'; // Cap at 9
             }
         }
     });

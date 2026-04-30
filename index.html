@@ -10,6 +10,8 @@
     <script src="chart.min.js"></script>
     <!-- Three.js for 3D Earth Background -->
     <script src="three.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="OrbitControls.js"></script>
 </head>
 <body>
@@ -822,8 +824,12 @@
                                 <div class="glass-card glass">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                                         <h3>🔄 Task Redistribution Engine</h3>
-                                        <div id="rebalance-target-name" style="font-weight: 600; color: var(--primary);">Select an employee</div>
+                                        <div style="display: flex; gap: 8px; align-items: center;">
+                                            <button class="btn btn-outline" style="padding: 4px 12px; font-size: 0.8rem;" onclick="undoLastRebalance()">↩️ Undo</button>
+                                            <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="autoBalanceTasks()">🤖 Auto Balance</button>
+                                        </div>
                                     </div>
+                                    <div id="rebalance-target-name" style="font-weight: 600; color: var(--primary); margin-bottom: 12px;">Select an employee</div>
                                     <div id="pending-tasks-list">
                                         <div style="text-align: center; color: var(--text-muted); padding: 20px;">Select an at-risk employee to view and reassign their pending tasks.</div>
                                     </div>
