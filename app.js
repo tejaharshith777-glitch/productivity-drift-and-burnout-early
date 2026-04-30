@@ -88,6 +88,8 @@ function login(user) {
     renderNotifications();
     fetchTeamData();
     renderWorkSessionHeatmap();
+    loadSettings();
+    populateProfileData();
 }
 
 function logout() {
@@ -465,6 +467,7 @@ function saveProfile() {
     if (currentUser) {
         currentUser.name = document.getElementById('profile-name').value;
         currentUser.email = document.getElementById('profile-email').value;
+        currentUser.dept = document.getElementById('profile-dept').value;
         
         document.getElementById('user-display-name').textContent = currentUser.name;
         document.getElementById('user-avatar').textContent = currentUser.name.charAt(0);
@@ -476,13 +479,19 @@ function saveProfile() {
         document.getElementById('profile-completion-text').textContent = '100%';
         document.getElementById('profile-progress').style.width = '100%';
         
+        localStorage.setItem('mindguard_user', JSON.stringify(currentUser));
         alert('Profile updated!');
     }
 }
 
-// Theme Toggle
-function toggleTheme() {
-    const isDark = document.getElementById('setting-dark').checked;
+// ===== THEME SYSTEM =====
+function applyThemeSetting() {
+    const theme = document.getElementById('setting-theme').value;
+    let isDark = true;
+    
+    if (theme === 'light') isDark = false;
+    else if (theme === 'system') isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
     if (!isDark) {
         document.documentElement.style.setProperty('--bg-gradient', 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)');
         document.documentElement.style.setProperty('--glass-bg', 'rgba(255, 255, 255, 0.8)');
@@ -496,6 +505,335 @@ function toggleTheme() {
         document.documentElement.style.setProperty('--text-main', '#f8fafc');
         document.documentElement.style.setProperty('--text-muted', '#94a3b8');
     }
+    saveAllSettings();
+}
+
+function toggleTheme() { applyThemeSetting(); }
+
+// ===== SETTINGS PERSISTENCE =====
+function getSettings() {
+    const saved = localStorage.getItem('mindguard_settings');
+    return saved ? JSON.parse(saved) : {
+        theme: 'dark',
+        sensitivity: 'balanced',
+        notifBurnout: true, notifAnomaly: true, notifTeam: true,
+        trackSleep: true, trackHeartrate: true, trackFatigue: true, trackBehavior: true,
+        shareWithHead: true,
+        visBurnout: true, visHealth: false, visPatterns: true,
+        headAlertThreshold: 60, headInterventionTrigger: '3days',
+        aiEnabled: true, aiFrequency: 'daily', aiExplain: true,
+        workStart: '09:00', workEnd: '18:00', breaksPerDay: 3, offhoursBlock: true
+    };
+}
+
+function saveAllSettings() {
+    const settings = {
+        theme: document.getElementById('setting-theme')?.value || 'dark',
+        sensitivity: document.getElementById('setting-sensitivity')?.value || 'balanced',
+        notifBurnout: document.getElementById('notif-burnout')?.checked ?? true,
+        notifAnomaly: document.getElementById('notif-anomaly')?.checked ?? true,
+        notifTeam: document.getElementById('notif-team')?.checked ?? true,
+        trackSleep: document.getElementById('track-sleep')?.checked ?? true,
+        trackHeartrate: document.getElementById('track-heartrate')?.checked ?? true,
+        trackFatigue: document.getElementById('track-fatigue')?.checked ?? true,
+        trackBehavior: document.getElementById('track-behavior')?.checked ?? true,
+        shareWithHead: document.getElementById('setting-privacy')?.checked ?? true,
+        visBurnout: document.getElementById('vis-burnout')?.checked ?? true,
+        visHealth: document.getElementById('vis-health')?.checked ?? false,
+        visPatterns: document.getElementById('vis-patterns')?.checked ?? true,
+        headAlertThreshold: parseInt(document.getElementById('head-alert-threshold')?.value) || 60,
+        headInterventionTrigger: document.getElementById('head-intervention-trigger')?.value || '3days',
+        aiEnabled: document.getElementById('ai-enabled')?.checked ?? true,
+        aiFrequency: document.getElementById('ai-frequency')?.value || 'daily',
+        aiExplain: document.getElementById('ai-explain')?.checked ?? true,
+        workStart: document.getElementById('sys-work-start')?.value || '09:00',
+        workEnd: document.getElementById('sys-work-end')?.value || '18:00',
+        breaksPerDay: parseInt(document.getElementById('sys-breaks')?.value) || 3,
+        offhoursBlock: document.getElementById('sys-offhours')?.checked ?? true
+    };
+    
+    localStorage.setItem('mindguard_settings', JSON.stringify(settings));
+    
+    // Immediately apply settings effects
+    applySettingsEffects(settings);
+}
+
+function loadSettings() {
+    const s = getSettings();
+    if (document.getElementById('setting-theme')) document.getElementById('setting-theme').value = s.theme;
+    if (document.getElementById('setting-sensitivity')) document.getElementById('setting-sensitivity').value = s.sensitivity;
+    if (document.getElementById('notif-burnout')) document.getElementById('notif-burnout').checked = s.notifBurnout;
+    if (document.getElementById('notif-anomaly')) document.getElementById('notif-anomaly').checked = s.notifAnomaly;
+    if (document.getElementById('notif-team')) document.getElementById('notif-team').checked = s.notifTeam;
+    if (document.getElementById('track-sleep')) document.getElementById('track-sleep').checked = s.trackSleep;
+    if (document.getElementById('track-heartrate')) document.getElementById('track-heartrate').checked = s.trackHeartrate;
+    if (document.getElementById('track-fatigue')) document.getElementById('track-fatigue').checked = s.trackFatigue;
+    if (document.getElementById('track-behavior')) document.getElementById('track-behavior').checked = s.trackBehavior;
+    if (document.getElementById('setting-privacy')) document.getElementById('setting-privacy').checked = s.shareWithHead;
+    if (document.getElementById('vis-burnout')) document.getElementById('vis-burnout').checked = s.visBurnout;
+    if (document.getElementById('vis-health')) document.getElementById('vis-health').checked = s.visHealth;
+    if (document.getElementById('vis-patterns')) document.getElementById('vis-patterns').checked = s.visPatterns;
+    if (document.getElementById('head-alert-threshold')) document.getElementById('head-alert-threshold').value = s.headAlertThreshold;
+    if (document.getElementById('head-intervention-trigger')) document.getElementById('head-intervention-trigger').value = s.headInterventionTrigger;
+    if (document.getElementById('ai-enabled')) document.getElementById('ai-enabled').checked = s.aiEnabled;
+    if (document.getElementById('ai-frequency')) document.getElementById('ai-frequency').value = s.aiFrequency;
+    if (document.getElementById('ai-explain')) document.getElementById('ai-explain').checked = s.aiExplain;
+    if (document.getElementById('sys-work-start')) document.getElementById('sys-work-start').value = s.workStart;
+    if (document.getElementById('sys-work-end')) document.getElementById('sys-work-end').value = s.workEnd;
+    if (document.getElementById('sys-breaks')) document.getElementById('sys-breaks').value = s.breaksPerDay;
+    if (document.getElementById('sys-offhours')) document.getElementById('sys-offhours').checked = s.offhoursBlock;
+    
+    applySettingsEffects(s);
+}
+
+function applySettingsEffects(s) {
+    // AI toggle: hide/show AI insight panels
+    const aiPanels = document.querySelectorAll('#profile-ai-insights, #smart-alerts-list');
+    aiPanels.forEach(p => { if (p) p.style.opacity = s.aiEnabled ? '1' : '0.3'; });
+    
+    // Sensitivity affects alert visibility thresholds
+    window._aiSensitivity = s.sensitivity;
+    window._aiEnabled = s.aiEnabled;
+    window._headAlertThreshold = s.headAlertThreshold;
+    window._trackSleep = s.trackSleep;
+    window._trackHeartrate = s.trackHeartrate;
+    window._trackFatigue = s.trackFatigue;
+}
+
+// ===== PROFILE ROLE TOGGLE =====
+function toggleProfileRole() {
+    const isHead = document.getElementById('profile-role-toggle').checked;
+    document.getElementById('profile-employee-view').style.display = isHead ? 'none' : 'block';
+    document.getElementById('profile-head-view').style.display = isHead ? 'block' : 'none';
+    document.getElementById('profile-role-label').textContent = isHead ? 'Team Lead View' : 'Employee View';
+    
+    if (isHead) populateHeadProfileData();
+}
+
+// ===== PROFILE DATA POPULATION =====
+function populateProfileData() {
+    const s = getSettings();
+    const user = currentUser || {};
+    const health = user.healthData || {};
+    
+    // Work Patterns — simulate based on settings
+    const workStart = parseInt((s.workStart || '09:00').split(':')[0]);
+    const workEnd = parseInt((s.workEnd || '18:00').split(':')[0]);
+    const workHoursTotal = workEnd - workStart;
+    const focusHours = (workHoursTotal * (0.5 + Math.random() * 0.2)).toFixed(1);
+    const breaksActual = (s.breaksPerDay + (Math.random() * 2 - 1)).toFixed(1);
+    const peakStart = workStart + Math.floor(Math.random() * 2);
+    const peakEnd = peakStart + 2;
+    const deepPct = Math.floor(55 + Math.random() * 15);
+    
+    if (document.getElementById('prof-focus-hours')) document.getElementById('prof-focus-hours').textContent = focusHours;
+    if (document.getElementById('prof-break-pattern')) document.getElementById('prof-break-pattern').textContent = breaksActual;
+    if (document.getElementById('prof-peak-window')) document.getElementById('prof-peak-window').textContent = `${peakStart}–${peakEnd} ${peakStart < 12 ? 'AM' : 'PM'}`;
+    if (document.getElementById('prof-deep-shallow')) document.getElementById('prof-deep-shallow').textContent = `${deepPct}/${100 - deepPct}`;
+    
+    // Behavioral Metrics
+    const taskConsistency = Math.floor(70 + Math.random() * 20);
+    const reworkFreq = Math.floor(5 + Math.random() * 15);
+    const responseLatency = Math.floor(8 + Math.random() * 20);
+    
+    if (document.getElementById('prof-task-consistency')) {
+        document.getElementById('prof-task-consistency').textContent = taskConsistency + '%';
+        document.getElementById('prof-task-consistency-bar').style.width = taskConsistency + '%';
+    }
+    if (document.getElementById('prof-rework-freq')) {
+        document.getElementById('prof-rework-freq').textContent = reworkFreq + '%';
+        document.getElementById('prof-rework-bar').style.width = reworkFreq + '%';
+    }
+    if (document.getElementById('prof-response-latency')) {
+        document.getElementById('prof-response-latency').textContent = responseLatency + 'm';
+        document.getElementById('prof-response-bar').style.width = Math.min(100, responseLatency * 2) + '%';
+    }
+    
+    // Wellbeing Indicators
+    const burnout = user.burnout || 'Medium';
+    const fatigueLevel = health.fatigue_level || Math.floor(3 + Math.random() * 5);
+    const cogLoad = Math.floor(50 + Math.random() * 30);
+    const baselineDev = Math.floor(Math.random() * 20 - 10);
+    
+    const fatigueSignal = fatigueLevel > 7 ? 'High' : fatigueLevel > 4 ? 'Moderate' : 'Low';
+    const fatigueColor = fatigueLevel > 7 ? 'var(--danger)' : fatigueLevel > 4 ? 'var(--warning)' : 'var(--success)';
+    const burnoutColor = burnout === 'High' ? 'var(--danger)' : burnout === 'Medium' ? 'var(--warning)' : 'var(--success)';
+    
+    if (document.getElementById('prof-fatigue-signal')) {
+        document.getElementById('prof-fatigue-signal').textContent = fatigueSignal;
+        document.getElementById('prof-fatigue-signal').style.color = fatigueColor;
+    }
+    if (document.getElementById('prof-burnout-risk')) {
+        document.getElementById('prof-burnout-risk').textContent = burnout;
+        document.getElementById('prof-burnout-risk').style.color = burnoutColor;
+    }
+    if (document.getElementById('prof-cognitive-load')) document.getElementById('prof-cognitive-load').textContent = cogLoad + '%';
+    if (document.getElementById('prof-baseline-dev')) {
+        const devText = baselineDev >= 0 ? `+${baselineDev}%` : `${baselineDev}%`;
+        document.getElementById('prof-baseline-dev').textContent = devText;
+        document.getElementById('prof-baseline-dev').style.color = Math.abs(baselineDev) > 8 ? 'var(--danger)' : 'var(--primary)';
+    }
+    
+    // AI Insights — dynamic based on real data
+    const insightsEl = document.getElementById('profile-ai-insights');
+    if (insightsEl && s.aiEnabled) {
+        insightsEl.innerHTML = '';
+        const insights = [];
+        if (cogLoad > 70) insights.push('🧠 Cognitive load above optimal (>70%) — consider reducing multitasking');
+        if (parseFloat(focusHours) < 4) insights.push(`📉 Focus hours low at ${focusHours}h/day — block distraction-free periods`);
+        if (reworkFreq > 12) insights.push(`🔄 Rework frequency at ${reworkFreq}% — check requirement clarity`);
+        if (fatigueLevel > 6) insights.push(`⚡ Fatigue signal elevated — sleep & break patterns need attention`);
+        if (responseLatency > 20) insights.push(`⏱️ Response latency at ${responseLatency}m — above 15m threshold`);
+        insights.push(`⚡ Peak cognitive window: ${peakStart}–${peakEnd} ${peakStart < 12 ? 'AM' : 'PM'}. Schedule critical tasks here.`);
+        if (Math.abs(baselineDev) > 5) insights.push(`📊 Baseline deviation at ${baselineDev > 0 ? '+' : ''}${baselineDev}% — ${baselineDev > 0 ? 'improving' : 'declining'} trend`);
+        
+        insights.forEach(i => {
+            const li = document.createElement('li');
+            li.textContent = i;
+            insightsEl.appendChild(li);
+        });
+    }
+    
+    // Collaboration Graph
+    const collabEl = document.getElementById('collab-graph');
+    if (collabEl) {
+        const collaborators = ['Sarah K.', 'Mike T.', 'Priya R.', 'James L.', 'Nina W.'];
+        const intensity = collaborators.map(() => Math.floor(30 + Math.random() * 70));
+        collabEl.innerHTML = collaborators.map((name, i) => `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">${name.charAt(0)}</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 0.85rem; font-weight: 500;">${name}</div>
+                    <div style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 4px;">
+                        <div style="width: ${intensity[i]}%; height: 100%; background: var(--primary); border-radius: 2px; opacity: ${0.4 + intensity[i] / 150};"></div>
+                    </div>
+                </div>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">${intensity[i]}%</span>
+            </div>
+        `).join('');
+    }
+    
+    // Role toggle visibility
+    if (currentUser && currentUser.role === 'head') {
+        document.getElementById('profile-role-toggle').parentElement.parentElement.style.display = 'flex';
+    }
+}
+
+function populateHeadProfileData() {
+    const saved = localStorage.getItem('mindguard_sim_data');
+    if (!saved) return;
+    
+    const data = JSON.parse(saved);
+    const { employees, highCount, mediumCount, lowCount } = data;
+    
+    if (document.getElementById('head-low-count')) document.getElementById('head-low-count').textContent = lowCount;
+    if (document.getElementById('head-med-count')) document.getElementById('head-med-count').textContent = mediumCount;
+    if (document.getElementById('head-high-count')) document.getElementById('head-high-count').textContent = highCount;
+    
+    // Resource Strain
+    const strainEl = document.getElementById('resource-strain-list');
+    if (strainEl && employees) {
+        const overloaded = employees.filter(e => e.working_hours > 10 && e.burnout >= 50).slice(0, 5);
+        const underutilized = employees.filter(e => e.working_hours < 6 && e.burnout < 30).slice(0, 5);
+        
+        strainEl.innerHTML = `
+            <div style="margin-bottom: 16px;">
+                <div style="font-weight: 600; color: var(--danger); margin-bottom: 8px;">🔴 Overloaded (${overloaded.length})</div>
+                ${overloaded.map(e => `<div style="padding: 6px 12px; background: rgba(255,0,85,0.05); border-radius: 6px; margin-bottom: 4px; font-size: 0.85rem;">${e.name} — ${e.working_hours}h/day, burnout: ${e.burnout}</div>`).join('')}
+                ${overloaded.length === 0 ? '<div style="font-size: 0.85rem; color: var(--text-muted);">None currently</div>' : ''}
+            </div>
+            <div>
+                <div style="font-weight: 600; color: var(--primary); margin-bottom: 8px;">🔵 Underutilized (${underutilized.length})</div>
+                ${underutilized.map(e => `<div style="padding: 6px 12px; background: rgba(0,255,255,0.05); border-radius: 6px; margin-bottom: 4px; font-size: 0.85rem;">${e.name} — ${e.working_hours}h/day, burnout: ${e.burnout}</div>`).join('')}
+                ${underutilized.length === 0 ? '<div style="font-size: 0.85rem; color: var(--text-muted);">None currently</div>' : ''}
+            </div>
+        `;
+    }
+    
+    // Risk Alerts
+    const alertsEl = document.getElementById('head-risk-alerts');
+    if (alertsEl && employees) {
+        alertsEl.innerHTML = '';
+        const highRisk = employees.filter(e => e.risk === 'High');
+        const reworkAlerts = employees.filter(e => e.burnout >= 50 && e.fatigue_level > 7);
+        
+        if (highRisk.length > 0) {
+            const li = document.createElement('li');
+            li.style.borderLeftColor = 'var(--danger)';
+            li.textContent = `🚨 ${highRisk.length} member(s) in High burnout zone — immediate attention required`;
+            alertsEl.appendChild(li);
+        }
+        if (reworkAlerts.length > 0) {
+            const li = document.createElement('li');
+            li.style.borderLeftColor = 'var(--warning)';
+            li.textContent = `⚠️ ${reworkAlerts.length} members showing early burnout signals due to high fatigue and elevated risk`;
+            alertsEl.appendChild(li);
+        }
+        
+        const sleepAlerts = employees.filter(e => e.sleep_hours < 5);
+        if (sleepAlerts.length > 0) {
+            const li = document.createElement('li');
+            li.style.borderLeftColor = 'var(--warning)';
+            li.textContent = `😴 ${sleepAlerts.length} members reporting less than 5h sleep — fatigue risk`;
+            alertsEl.appendChild(li);
+        }
+    }
+    
+    // Deviation Drilldown
+    const drilldownEl = document.getElementById('deviation-drilldown');
+    if (drilldownEl && employees) {
+        const deviating = employees.filter(e => e.burnout >= 40 && e.fatigue_level > 5).slice(0, 8);
+        drilldownEl.innerHTML = deviating.map(e => {
+            const reasons = [];
+            if (e.sleep_hours < 5) reasons.push('low sleep');
+            if (e.heart_rate > 95) reasons.push('elevated HR');
+            if (e.fatigue_level > 7) reasons.push('high fatigue');
+            if (e.working_hours > 10) reasons.push('overwork');
+            return `<div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 6px; margin-bottom: 8px; border-left: 3px solid var(--${e.risk === 'High' ? 'danger' : 'warning'});">
+                <div style="font-weight: 600;">${e.name} <span style="color: var(--${e.colorClass}); font-size: 0.8rem;">${e.risk}</span></div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">AI: Deviating from baseline — ${reasons.length > 0 ? reasons.join(', ') : 'multiple factors'}</div>
+            </div>`;
+        }).join('');
+    }
+}
+
+function reportOverwhelm(isOverwhelmed) {
+    const user = currentUser || {};
+    user.overwhelmReported = isOverwhelmed;
+    user.overwhelmTimestamp = new Date().toISOString();
+    localStorage.setItem('mindguard_user', JSON.stringify(user));
+    
+    if (isOverwhelmed) {
+        alert('🫂 We hear you. Your response has been recorded privately.\n\nAI suggestion: Take a 10-minute break, step away from your screen, and practice deep breathing.');
+    } else {
+        alert('✅ Great to hear! Keep monitoring your patterns.');
+    }
+}
+
+function explainMyRisk() {
+    const user = currentUser || {};
+    const health = user.healthData || {};
+    const settings = getSettings();
+    
+    let explanation = '📊 AI Risk Assessment Explanation:\n\n';
+    explanation += `Current burnout level: ${user.burnout || 'Not assessed'}\n\n`;
+    explanation += 'Contributing factors:\n';
+    
+    if (health.sleep_hours && health.sleep_hours < 6) explanation += `• Sleep: ${health.sleep_hours}h (below recommended 7h)\n`;
+    else explanation += '• Sleep: Within normal range\n';
+    
+    if (health.heart_rate && health.heart_rate > 90) explanation += `• Heart rate: ${health.heart_rate} bpm (elevated)\n`;
+    else explanation += '• Heart rate: Normal\n';
+    
+    if (health.fatigue_level && health.fatigue_level > 6) explanation += `• Fatigue: ${health.fatigue_level}/10 (above threshold)\n`;
+    else explanation += '• Fatigue: Manageable\n';
+    
+    if (health.headache_status) explanation += '• Headache: Reported\n';
+    
+    explanation += `\nAI sensitivity: ${settings.sensitivity.toUpperCase()}`;
+    explanation += `\nData source: ${health.source || 'simulated'}`;
+    
+    alert(explanation);
 }
 
 // Global Chart Instances

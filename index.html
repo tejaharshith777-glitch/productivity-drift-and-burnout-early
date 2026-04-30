@@ -674,26 +674,43 @@
 
                     <section id="profile-screen" class="screen">
                         <h1 style="margin-bottom: 24px;">Profile</h1>
-                        <div class="glass-card glass" style="max-width: 600px;">
-                            <div class="form-group">
-                                <label for="profile-name">Full Name</label>
-                                <input type="text" id="profile-name" value="User">
+                        
+                        <!-- Role Switch Toggle (for dual-role users) -->
+                        <div class="glass-card glass" style="margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+                            <div>
+                                <div style="font-weight: 600;" id="profile-role-label">Employee View</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Switch between personal and team analytics</div>
                             </div>
-                            <div class="form-group">
-                                <label for="profile-email">Email Address</label>
-                                <input type="email" id="profile-email" value="user@company.com">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 0.85rem; color: var(--text-muted);">Personal</span>
+                                <input type="checkbox" id="profile-role-toggle" onchange="toggleProfileRole()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                <span style="font-size: 0.85rem; color: var(--text-muted);">Team Lead</span>
                             </div>
-                            <div class="form-group">
-                                <label for="profile-role">Role</label>
-                                <input type="text" id="profile-role" value="Team Member" disabled style="background: rgba(255,255,255,0.02); cursor: not-allowed;">
+                        </div>
+
+                        <!-- Core Profile Card -->
+                        <div class="glass-card glass" style="max-width: 100%; margin-bottom: 24px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label for="profile-name">Full Name</label>
+                                    <input type="text" id="profile-name" value="User">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profile-email">Email Address</label>
+                                    <input type="email" id="profile-email" value="user@company.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profile-role">Role</label>
+                                    <input type="text" id="profile-role" value="Team Member" disabled style="background: rgba(255,255,255,0.02); cursor: not-allowed;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profile-dept">Team / Department</label>
+                                    <input type="text" id="profile-dept" value="Engineering">
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="profile-dept">Team / Department</label>
-                                <input type="text" id="profile-dept" value="Engineering">
-                            </div>
-                            <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+                            <button class="btn btn-primary" onclick="saveProfile()" style="margin-top: 12px;">Save Changes</button>
                             
-                            <div style="margin-top: 30px;">
+                            <div style="margin-top: 20px;">
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                                     <span>Profile Completion</span>
                                     <span id="profile-completion-text">80%</span>
@@ -703,40 +720,357 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Employee-Specific Profile Sections -->
+                        <div id="profile-employee-view">
+                            <!-- Work Patterns -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>📊 Work Patterns</h3>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-top: 16px;">
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);" id="prof-focus-hours">5.2</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Focus Hours/Day</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;" id="prof-break-pattern">3.1</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Breaks/Day</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: #f59e0b;" id="prof-peak-window">9–11 AM</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Peak Productivity</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="prof-deep-shallow">62/38</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Deep/Shallow %</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Behavioral Metrics -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>🧠 Behavioral Metrics</h3>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-top: 16px;">
+                                    <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted);">Task Completion Consistency</div>
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                            <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px;">
+                                                <div id="prof-task-consistency-bar" style="width: 78%; height: 100%; background: var(--primary); border-radius: 3px;"></div>
+                                            </div>
+                                            <span style="font-weight: 600;" id="prof-task-consistency">78%</span>
+                                        </div>
+                                    </div>
+                                    <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted);">Rework Frequency</div>
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                            <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px;">
+                                                <div id="prof-rework-bar" style="width: 12%; height: 100%; background: var(--warning); border-radius: 3px;"></div>
+                                            </div>
+                                            <span style="font-weight: 600;" id="prof-rework-freq">12%</span>
+                                        </div>
+                                    </div>
+                                    <div style="padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.85rem; color: var(--text-muted);">Response Latency</div>
+                                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                            <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px;">
+                                                <div id="prof-response-bar" style="width: 35%; height: 100%; background: #8b5cf6; border-radius: 3px;"></div>
+                                            </div>
+                                            <span style="font-weight: 600;" id="prof-response-latency">14m</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Wellbeing Indicators -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>💚 Wellbeing Indicators</h3>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-top: 16px;">
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Fatigue Signal</div>
+                                        <div style="font-size: 1.4rem; font-weight: 700; color: var(--success);" id="prof-fatigue-signal">Low</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Burnout Risk</div>
+                                        <div style="font-size: 1.4rem; font-weight: 700; color: var(--warning);" id="prof-burnout-risk">Medium</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Cognitive Load</div>
+                                        <div style="font-size: 1.4rem; font-weight: 700; color: #8b5cf6;" id="prof-cognitive-load">68%</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px;">
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Baseline Deviation</div>
+                                        <div style="font-size: 1.4rem; font-weight: 700; color: var(--primary);" id="prof-baseline-dev">+3%</div>
+                                    </div>
+                                </div>
+                                <!-- Quick wellbeing tap -->
+                                <div style="margin-top: 16px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+                                    <span style="font-size: 0.9rem;">Feeling overwhelmed right now?</span>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn btn-outline" style="padding: 4px 16px; font-size: 0.8rem;" onclick="reportOverwhelm(false)">No</button>
+                                        <button class="btn btn-danger" style="padding: 4px 16px; font-size: 0.8rem;" onclick="reportOverwhelm(true)">Yes</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI Insights Summary -->
+                            <div class="glass-card glass" style="margin-bottom: 24px; border-color: var(--primary);">
+                                <h3>🤖 AI-Generated Insights</h3>
+                                <ul class="suggestions-list" id="profile-ai-insights" style="margin-top: 16px;">
+                                    <li>📉 Your productivity dips after 4 PM consistently over 2 weeks</li>
+                                    <li>😴 Sleep patterns suggest fatigue accumulation — avg 6.1h vs recommended 7.5h</li>
+                                    <li>🔄 Rework frequency increased 8% this week — check task clarity</li>
+                                    <li>⚡ Peak cognitive window: 9–11 AM. Schedule critical tasks here.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Collaboration Graph -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>🤝 Collaboration Graph</h3>
+                                <div id="collab-graph" style="margin-top: 16px;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Team Head-Specific Profile Sections -->
+                        <div id="profile-head-view" style="display: none;">
+                            <!-- Team Distribution -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>📊 Team Distribution Insights</h3>
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px;">
+                                    <div style="text-align: center; padding: 16px; background: rgba(0,255,136,0.05); border-radius: 8px; border: 1px solid rgba(0,255,136,0.2);">
+                                        <div style="font-size: 2rem; font-weight: 700; color: var(--success);" id="head-low-count">--</div>
+                                        <div style="color: var(--text-muted); font-size: 0.85rem;">Low Burnout</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 16px; background: rgba(255,204,0,0.05); border-radius: 8px; border: 1px solid rgba(255,204,0,0.2);">
+                                        <div style="font-size: 2rem; font-weight: 700; color: var(--warning);" id="head-med-count">--</div>
+                                        <div style="color: var(--text-muted); font-size: 0.85rem;">Medium Burnout</div>
+                                    </div>
+                                    <div style="text-align: center; padding: 16px; background: rgba(255,0,85,0.05); border-radius: 8px; border: 1px solid rgba(255,0,85,0.2);">
+                                        <div style="font-size: 2rem; font-weight: 700; color: var(--danger);" id="head-high-count">--</div>
+                                        <div style="color: var(--text-muted); font-size: 0.85rem;">High Burnout (max 9)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Resource Strain -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>⚖️ Resource Strain Analysis</h3>
+                                <div id="resource-strain-list" style="margin-top: 16px;"></div>
+                            </div>
+
+                            <!-- Risk Alerts for Head -->
+                            <div class="glass-card glass" style="margin-bottom: 24px; border-color: var(--danger);">
+                                <h3>🚨 Team Risk Alerts</h3>
+                                <ul class="suggestions-list" id="head-risk-alerts" style="margin-top: 16px;">
+                                    <li style="border-left-color: var(--danger);">Loading team data...</li>
+                                </ul>
+                            </div>
+
+                            <!-- Deviation Drilldown -->
+                            <div class="glass-card glass" style="margin-bottom: 24px;">
+                                <h3>🔍 Individual Deviation Drilldown</h3>
+                                <p style="color: var(--text-muted); font-size: 0.85rem; margin: 4px 0 12px;">Employees deviating from their personal baseline — AI explanation</p>
+                                <div id="deviation-drilldown" style="max-height: 300px; overflow-y: auto;"></div>
+                            </div>
+                        </div>
                     </section>
 
-                    <!-- 7. Settings Page -->
+                    <!-- 7. Settings Page — Control Center -->
                     <section id="settings-screen" class="screen">
                         <h1 style="margin-bottom: 24px;">Settings</h1>
-                        <div class="glass-card glass" style="max-width: 600px;">
-                            <h3>Preferences</h3>
+                        
+                        <!-- A. Personalization -->
+                        <div class="glass-card glass" style="margin-bottom: 24px;">
+                            <h3>🎨 Personalization</h3>
                             
                             <div style="margin: 20px 0; display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <div style="font-weight: 600;">Email Notifications</div>
-                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Receive burnout risk alerts via email</div>
+                                    <div style="font-weight: 600;">Theme</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Choose interface appearance</div>
                                 </div>
-                                <input type="checkbox" id="setting-email" checked style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                <select id="setting-theme" onchange="applyThemeSetting()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px 12px; border-radius: 6px;">
+                                    <option value="dark">Dark</option>
+                                    <option value="light">Light</option>
+                                    <option value="system">System</option>
+                                </select>
                             </div>
-                            
+
+                            <div style="margin: 20px 0;">
+                                <div style="font-weight: 600; margin-bottom: 12px;">Notification Preferences</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Burnout risk alerts</span>
+                                    <input type="checkbox" id="notif-burnout" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Productivity anomaly alerts</span>
+                                    <input type="checkbox" id="notif-anomaly" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Team alerts (for heads)</span>
+                                    <input type="checkbox" id="notif-team" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                            </div>
+
                             <div style="margin: 20px 0; display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <div style="font-weight: 600;">Privacy Controls</div>
-                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Share stress level data with Team Head</div>
+                                    <div style="font-weight: 600;">AI Sensitivity</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">How aggressively AI flags burnout</div>
                                 </div>
-                                <input type="checkbox" id="setting-privacy" checked style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                <select id="setting-sensitivity" onchange="saveAllSettings()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px 12px; border-radius: 6px;">
+                                    <option value="low">Low</option>
+                                    <option value="balanced" selected>Balanced</option>
+                                    <option value="strict">Strict</option>
+                                </select>
                             </div>
-                            
-                            <div style="margin: 20px 0; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <div style="font-weight: 600;">Dark Mode</div>
-                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Toggle rich dark interface</div>
-                                </div>
-                                <input type="checkbox" id="setting-dark" checked style="width: 20px; height: 20px; accent-color: var(--primary);" onchange="toggleTheme()">
-                            </div>
-                            
-                            <button class="btn btn-primary" onclick="alert('Settings Saved!')">Save Preferences</button>
                         </div>
+
+                        <!-- B. Privacy & Data Control -->
+                        <div class="glass-card glass" style="margin-bottom: 24px;">
+                            <h3>🔒 Privacy & Data Control</h3>
+                            
+                            <div style="margin: 16px 0; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 4px solid var(--primary);">
+                                <div style="font-weight: 600; margin-bottom: 8px;">📋 Data Transparency Panel</div>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">Currently tracking: Task completion, work hours, break patterns, stress check-ins, behavioral metrics, health indicators (simulated)</div>
+                            </div>
+
+                            <div style="margin: 16px 0;">
+                                <div style="font-weight: 600; margin-bottom: 12px;">Tracking Signal Opt-in/Opt-out</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Sleep estimation tracking</span>
+                                    <input type="checkbox" id="track-sleep" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Heart rate monitoring</span>
+                                    <input type="checkbox" id="track-heartrate" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Fatigue level tracking</span>
+                                    <input type="checkbox" id="track-fatigue" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Behavioral pattern analysis</span>
+                                    <input type="checkbox" id="track-behavior" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                            </div>
+
+                            <div style="margin: 16px 0; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 600;">Share data with Team Head</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Controls visibility of your stress & health data</div>
+                                </div>
+                                <input type="checkbox" id="setting-privacy" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                            </div>
+
+                            <button class="btn btn-outline" style="margin-top: 8px;" onclick="explainMyRisk()">Why am I flagged as at risk?</button>
+                        </div>
+
+                        <!-- C. Role-Based Controls -->
+                        <div class="glass-card glass" style="margin-bottom: 24px;">
+                            <h3>👤 Role-Based Controls</h3>
+                            
+                            <div id="settings-employee-controls">
+                                <div style="font-weight: 600; margin-bottom: 12px; color: var(--primary);">Employee Controls</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Show burnout score to manager</span>
+                                    <input type="checkbox" id="vis-burnout" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Show health metrics to manager</span>
+                                    <input type="checkbox" id="vis-health" onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="color: var(--text-muted); font-size: 0.9rem;">Show work patterns to manager</span>
+                                    <input type="checkbox" id="vis-patterns" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                                </div>
+                            </div>
+                            
+                            <div id="settings-head-controls" style="margin-top: 20px; border-top: 1px solid var(--glass-border); padding-top: 16px;">
+                                <div style="font-weight: 600; margin-bottom: 12px; color: var(--warning);">Team Head Controls</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                    <div>
+                                        <div style="font-size: 0.9rem;">Alert threshold (burnout score)</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Alert when employee exceeds this score</div>
+                                    </div>
+                                    <input type="number" id="head-alert-threshold" value="60" min="30" max="90" onchange="saveAllSettings()" style="width: 80px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px; border-radius: 6px; text-align: center;">
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <div style="font-size: 0.9rem;">Auto-intervention trigger</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-muted);">Automatically notify when burnout sustained</div>
+                                    </div>
+                                    <select id="head-intervention-trigger" onchange="saveAllSettings()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px; border-radius: 6px;">
+                                        <option value="immediate">Immediate</option>
+                                        <option value="3days" selected>After 3 days</option>
+                                        <option value="1week">After 1 week</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- D. AI Configuration -->
+                        <div class="glass-card glass" style="margin-bottom: 24px;">
+                            <h3>🤖 AI Configuration</h3>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0;">
+                                <div>
+                                    <div style="font-weight: 600;">Enable AI Insights</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Master switch for all AI-powered features</div>
+                                </div>
+                                <input type="checkbox" id="ai-enabled" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0;">
+                                <div>
+                                    <div style="font-weight: 600;">Insight Frequency</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">How often AI generates insights</div>
+                                </div>
+                                <select id="ai-frequency" onchange="saveAllSettings()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px 12px; border-radius: 6px;">
+                                    <option value="realtime">Real-time</option>
+                                    <option value="daily" selected>Daily summary</option>
+                                    <option value="weekly">Weekly summary</option>
+                                </select>
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0;">
+                                <div>
+                                    <div style="font-weight: 600;">Explain More</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Show detailed explanations on every AI insight</div>
+                                </div>
+                                <input type="checkbox" id="ai-explain" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                            </div>
+                        </div>
+
+                        <!-- E. System Behavior -->
+                        <div class="glass-card glass" style="margin-bottom: 24px;">
+                            <h3>⚙️ System Behavior</h3>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px;">
+                                <div class="form-group">
+                                    <label>Work Start Time</label>
+                                    <input type="time" id="sys-work-start" value="09:00" onchange="saveAllSettings()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px; border-radius: 6px; width: 100%;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Work End Time</label>
+                                    <input type="time" id="sys-work-end" value="18:00" onchange="saveAllSettings()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px; border-radius: 6px; width: 100%;">
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0;">
+                                <div>
+                                    <div style="font-weight: 600;">Expected Breaks/Day</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Used to detect unhealthy work patterns</div>
+                                </div>
+                                <input type="number" id="sys-breaks" value="3" min="0" max="10" onchange="saveAllSettings()" style="width: 80px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 8px; border-radius: 6px; text-align: center;">
+                            </div>
+
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0;">
+                                <div>
+                                    <div style="font-weight: 600;">Off-hours Notification Block</div>
+                                    <div style="color: var(--text-muted); font-size: 0.9rem;">Don't send alerts outside working hours</div>
+                                </div>
+                                <input type="checkbox" id="sys-offhours" checked onchange="saveAllSettings()" style="width: 20px; height: 20px; accent-color: var(--primary);">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="saveAllSettings()">Save All Preferences</button>
                     </section>
 
                 </main>
