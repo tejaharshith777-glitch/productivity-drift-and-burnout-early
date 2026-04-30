@@ -1750,6 +1750,162 @@ function generateAISummary(e) {
     return `Performance concern: ${issues.join(', ')}. Recommend ${e.burnout >= 60 ? 'immediate check-in and workload review' : 'monitoring over next 3 days'}.`;
 }
 
+// ===== TASK REDISTRIBUTION ENGINE =====
+let taskRecoveryMetrics = JSON.parse(localStorage.getItem('mindguard_task_metrics') || '{"score": 0, "reassigned": 0}');
+
+function getEmployeeTasks(empId, dept) {
+    let tasksDB = JSON.parse(localStorage.getItem('mindguard_employee_tasks') || '{}');
+    if (!tasksDB[empId]) {
+        // Generate simulated tasks
+        const numTasks = Math.floor(3 + Math.random() * 5);
+        tasksDB[empId] = [];
+        for (let i = 0; i < numTasks; i++) {
+            const isPriority = Math.random() > 0.6;
+            const status = Math.random() > 0.7 ? (Math.random() > 0.5 ? 'blocked' : 'delayed') : 'pending';
+            tasksDB[empId].push({
+                id: `TSK-${empId}-${Date.now().toString(36)}-${i}`,
+                title: `${dept} Deliverable ${String.fromCharCode(65+i)}`,
+                priority: isPriority ? 'High' : 'Normal',
+                status: status,
+                hours: Math.floor(2 + Math.random() * 6),
+                deadline: new Date(Date.now() + (Math.random() * 7 - 2) * 86400000).toLocaleDateString()
+            });
+        }
+        localStorage.setItem('mindguard_employee_tasks', JSON.stringify(tasksDB));
+    }
+    return tasksDB[empId];
+}
+
+function updateEmployeeTasks(empId, tasks) {
+    let tasksDB = JSON.parse(localStorage.getItem('mindguard_employee_tasks') || '{}');
+    tasksDB[empId] = tasks;
+    localStorage.setItem('mindguard_employee_tasks', JSON.stringify(tasksDB));
+}
+
+function renderTaskRebalancer() {
+    const emps = getAllEmployees();
+    const atRisk = emps.filter(e => e.burnout >= 50); // High/Critical or upper Medium
+    const listHtml = atRisk.map(e => {
+        const tasks = getEmployeeTasks(e.id, e.dept);
+        const criticalTasks = tasks.filter(t => t.priority === 'High' || t.status === 'delayed' || t.status === 'blocked');
+        if (criticalTasks.length === 0) return '';
+        
+        return `<div style="border: 1px solid var(--glass-border); padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: rgba(255,255,255,0.02);" onclick="selectRebalanceTarget('${e.id}')">
+            <div>
+                <div style="font-weight: 600;">${e.name}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">${e.dept} · Burnout: <span style="color: var(--danger); font-weight: bold;">${e.burnout}</span></div>
+            </div>
+            <div style="text-align: right;">
+                <div style="color: var(--warning); font-weight: 600;">${criticalTasks.length} At-Risk Tasks</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Click to reassign</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('at-risk-workloads').innerHTML = listHtml || '<div style="color: var(--success); padding: 20px; text-align: center;">No critical work gaps detected.</div>';
+    
+    // Update metrics
+    document.getElementById('metric-recovery-score').textContent = `${taskRecoveryMetrics.score}%`;
+    document.getElementById('metric-reassigned-count').textContent = taskRecoveryMetrics.reassigned;
+}
+
+let currentRebalanceTarget = null;
+let currentTaskId = null;
+
+function selectRebalanceTarget(empId) {
+    currentRebalanceTarget = empId;
+    const emps = getAllEmployees();
+    const emp = emps.find(e => e.id === empId);
+    if (!emp) return;
+
+    document.getElementById('rebalance-target-name').textContent = `Tasks for ${emp.name}`;
+    
+    const tasks = getEmployeeTasks(emp.id, emp.dept);
+    const listHtml = tasks.map(t => {
+        const statusColor = t.status === 'blocked' ? 'var(--danger)' : t.status === 'delayed' ? 'var(--warning)' : 'var(--primary)';
+        return `<div style="border: 1px solid var(--glass-border); padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div style="font-weight: 600;">${t.title}</div>
+                <div style="font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid ${statusColor}; color: ${statusColor};">${t.status.toUpperCase()}</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Priority: ${t.priority} · Est. ${t.hours}h · Due: ${t.deadline}</div>
+            <button class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" onclick="suggestReassignment('${emp.id}', '${t.id}')">Suggest Reassignment</button>
+        </div>`;
+    }).join('');
+
+    document.getElementById('pending-tasks-list').innerHTML = listHtml || '<div style="color: var(--text-muted); text-align: center;">No pending tasks.</div>';
+    document.getElementById('impact-awareness-panel').style.display = 'none';
+}
+
+function suggestReassignment(sourceEmpId, taskId) {
+    const emps = getAllEmployees();
+    const sourceEmp = emps.find(e => e.id === sourceEmpId);
+    const tasks = getEmployeeTasks(sourceEmpId, sourceEmp.dept);
+    const task = tasks.find(t => t.id === taskId);
+    if (!sourceEmp || !task) return;
+
+    currentTaskId = taskId;
+
+    // Filter available employees: same dept, burnout < 50, working_hours < 8
+    const candidates = emps.filter(e => e.id !== sourceEmpId && e.dept === sourceEmp.dept && e.burnout < 50 && e.working_hours < 8);
+    candidates.sort((a, b) => a.burnout - b.burnout); // Sort by lowest burnout
+
+    const panel = document.getElementById('impact-awareness-panel');
+    const details = document.getElementById('impact-details');
+
+    if (candidates.length === 0) {
+        details.innerHTML = `<div style="color: var(--danger); font-weight: 600;">No suitable candidates found in ${sourceEmp.dept}.</div>
+        <p style="color: var(--text-muted); font-size: 0.8rem;">All team members are either at high burnout risk or over capacity (>8h/day). Cross-department reassignment or deadline extension required.</p>`;
+        document.getElementById('btn-confirm-reassign').style.display = 'none';
+    } else {
+        const top = candidates[0];
+        const newHours = (top.working_hours + (task.hours / 5)).toFixed(1); // Spread task hours over a week roughly
+        const newRisk = newHours > 8 ? 'Medium' : top.risk;
+        
+        details.innerHTML = `
+            <div style="margin-bottom: 12px;"><strong>Suggested Assignee:</strong> ${top.name} (Burnout: ${top.burnout}, ${top.working_hours}h/day)</div>
+            <div style="margin-bottom: 8px;"><strong>Simulated Impact on ${top.name}:</strong></div>
+            <ul style="color: var(--text-muted); margin: 0; padding-left: 20px;">
+                <li>Workload: ${top.working_hours}h ➔ <span style="color: var(--warning);">${newHours}h</span></li>
+                <li>Burnout Risk: ${top.risk} ➔ <span style="color: ${newRisk === 'Medium' ? 'var(--warning)' : 'var(--success)'};">${newRisk}</span></li>
+            </ul>
+        `;
+        const btn = document.getElementById('btn-confirm-reassign');
+        btn.style.display = 'block';
+        btn.onclick = () => executeReassignment(sourceEmpId, top.id, taskId);
+    }
+    
+    panel.style.display = 'block';
+}
+
+function executeReassignment(sourceEmpId, targetEmpId, taskId) {
+    const emps = getAllEmployees();
+    const sourceEmp = emps.find(e => e.id === sourceEmpId);
+    let tasks = getEmployeeTasks(sourceEmpId, sourceEmp.dept);
+    const taskIndex = tasks.findIndex(t => t.id === taskId);
+    if (taskIndex === -1) return;
+    
+    const task = tasks.splice(taskIndex, 1)[0];
+    updateEmployeeTasks(sourceEmpId, tasks);
+    
+    const targetEmp = emps.find(e => e.id === targetEmpId);
+    let targetTasks = getEmployeeTasks(targetEmpId, targetEmp.dept);
+    targetTasks.push(task);
+    updateEmployeeTasks(targetEmpId, targetTasks);
+
+    // Update metrics
+    taskRecoveryMetrics.reassigned += 1;
+    taskRecoveryMetrics.score = Math.min(100, taskRecoveryMetrics.score + Math.floor(5 + Math.random() * 10));
+    if (taskRecoveryMetrics.score === 0) taskRecoveryMetrics.score = 85;
+    localStorage.setItem('mindguard_task_metrics', JSON.stringify(taskRecoveryMetrics));
+
+    document.getElementById('impact-awareness-panel').style.display = 'none';
+    selectRebalanceTarget(sourceEmpId);
+    renderTaskRebalancer();
+    
+    alert(`✅ Task "${task.title}" successfully reassigned from ${sourceEmp.name} to ${targetEmp.name}.`);
+}
+
 // ===== ALERT CENTER ENGINE =====
 let systemAlerts = [];
 
@@ -1780,6 +1936,27 @@ function generateSystemAlerts() {
         }
         if (e.sleep_hours < 4.5) {
             systemAlerts.push({ severity: 'high', category: 'burnout', employee: e.name, dept: e.dept, desc: `Sleep critically low at ${e.sleep_hours}h`, rootCause: 'Possible chronic sleep deprivation', action: 'Flag for wellness check', ts: new Date(now - Math.random()*7200000) });
+        }
+        // Work Continuity Risk (Gap Detection)
+        if (e.burnout >= 50) {
+            const tasks = getEmployeeTasks(e.id, e.dept) || [];
+            const criticalTasks = tasks.filter(t => t.priority === 'High' || t.status === 'delayed' || t.status === 'blocked');
+            if (criticalTasks.length > 0) {
+                const k = `work_gap_${e.id}`;
+                if (!seenKeys.has(k)) { 
+                    seenKeys.add(k); 
+                    systemAlerts.push({ 
+                        severity: e.burnout >= 70 ? 'critical' : 'high', 
+                        category: 'continuity', 
+                        employee: e.name, 
+                        dept: e.dept, 
+                        desc: `${criticalTasks.length} critical/delayed tasks at risk due to burnout`, 
+                        rootCause: `Employee is at ${e.burnout >= 70 ? 'critical' : 'high'} burnout risk with pending high-priority work`, 
+                        action: 'Use Task Rebalancer to redistribute workload', 
+                        ts: new Date(now - Math.random()*1800000) 
+                    }); 
+                }
+            }
         }
     });
 
@@ -1840,7 +2017,7 @@ function renderAlertCenter() {
     if (!tbody) return;
     tbody.innerHTML = filtered.map((a, i) => {
         const sevColor = a.severity === 'critical' ? 'var(--danger)' : a.severity === 'high' ? 'var(--warning)' : a.severity === 'medium' ? 'var(--primary)' : 'var(--success)';
-        const catIcon = a.category === 'burnout' ? '🔥' : a.category === 'drift' ? '📉' : a.category === 'behavior' ? '⚠️' : '⚙️';
+        const catIcon = a.category === 'burnout' ? '🔥' : a.category === 'drift' ? '📉' : a.category === 'behavior' ? '⚠️' : a.category === 'continuity' ? '⚖️' : '⚙️';
         return `<tr style="border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;" onclick="expandAlertDetail(${i})">
             <td style="padding: 10px; font-size: 0.85rem;">${a.ts.toLocaleString()}</td>
             <td style="padding: 10px; color: ${sevColor}; font-weight: bold; text-transform: uppercase; font-size: 0.8rem;">${a.severity}</td>

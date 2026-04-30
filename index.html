@@ -110,6 +110,9 @@
                         <li class="nav-item team-exclusive" style="display: none;">
                             <a href="#" onclick="switchScreen('employees-screen')">👥 Employees</a>
                         </li>
+                        <li class="nav-item team-exclusive" style="display: none;">
+                            <a href="#" onclick="switchScreen('rebalancer-screen')">⚖️ Task Rebalancer</a>
+                        </li>
                         <li class="nav-item" id="nav-profile">
 
                             <a href="#" onclick="switchScreen('profile-screen')">
@@ -462,6 +465,7 @@
                                 <option value="burnout">Burnout Risk</option>
                                 <option value="drift">Productivity Drift</option>
                                 <option value="behavior">Behavioral Anomaly</option>
+                                <option value="continuity">Work Continuity Risk</option>
                                 <option value="system">System/Task</option>
                             </select>
                             <select id="alert-filter-dept" onchange="renderAlertCenter()" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: var(--text-main); padding: 6px 10px; border-radius: 6px;">
@@ -793,6 +797,78 @@
                         <div class="glass-card glass">
                             <h3>📋 Employee Roster</h3>
                             <div id="employee-roster" style="margin-top: 16px;"></div>
+                        </div>
+                    </section>
+
+                    <!-- Task Rebalancer Section -->
+                    <section id="rebalancer-screen" class="screen">
+                        <h1 style="margin-bottom: 24px;">⚖️ Task Rebalancer</h1>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
+                            <!-- Main Rebalancer Engine -->
+                            <div style="display: flex; flex-direction: column; gap: 24px;">
+                                
+                                <!-- Work Gap Detection (At-Risk Workloads) -->
+                                <div class="glass-card glass">
+                                    <h3>⚠️ At-Risk Workloads (Work Gap Detection)</h3>
+                                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">Identifying critical and high burnout employees with pending critical tasks.</p>
+                                    <div id="at-risk-workloads">
+                                        <!-- Populated via JS -->
+                                        <div style="text-align: center; color: var(--text-muted); padding: 20px;">Scanning for at-risk workloads...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Smart Task Redistribution Engine (Tasks for selected employee) -->
+                                <div class="glass-card glass">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                        <h3>🔄 Task Redistribution Engine</h3>
+                                        <div id="rebalance-target-name" style="font-weight: 600; color: var(--primary);">Select an employee</div>
+                                    </div>
+                                    <div id="pending-tasks-list">
+                                        <div style="text-align: center; color: var(--text-muted); padding: 20px;">Select an at-risk employee to view and reassign their pending tasks.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Column: Recovery Tracking & Protection Logic -->
+                            <div style="display: flex; flex-direction: column; gap: 24px;">
+                                
+                                <!-- Task Recovery Tracking Metrics -->
+                                <div class="glass-card glass">
+                                    <h3>📊 Task Recovery Tracking</h3>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
+                                        <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 8px; text-align: center; border: 1px solid var(--glass-border);">
+                                            <div style="font-size: 2rem; font-weight: 700; color: var(--success);" id="metric-recovery-score">0%</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-muted);">Recovery Efficiency</div>
+                                        </div>
+                                        <div style="background: rgba(255,255,255,0.02); padding: 16px; border-radius: 8px; text-align: center; border: 1px solid var(--glass-border);">
+                                            <div style="font-size: 2rem; font-weight: 700; color: var(--primary);" id="metric-reassigned-count">0</div>
+                                            <div style="font-size: 0.75rem; color: var(--text-muted);">Tasks Reassigned</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Reassignment Impact Modal Area (inline for simplicity) -->
+                                <div class="glass-card glass" id="impact-awareness-panel" style="display: none; border-left: 3px solid var(--warning);">
+                                    <h3>🧠 Impact Awareness</h3>
+                                    <div id="impact-details" style="margin-top: 12px; font-size: 0.9rem;">
+                                    </div>
+                                    <div style="display: flex; gap: 8px; margin-top: 16px;">
+                                        <button class="btn btn-primary" id="btn-confirm-reassign">Confirm Reassignment</button>
+                                        <button class="btn btn-outline" onclick="document.getElementById('impact-awareness-panel').style.display='none'">Cancel</button>
+                                    </div>
+                                </div>
+
+                                <!-- Employee Protection Logic Note -->
+                                <div class="glass-card glass" style="background: rgba(0,255,255,0.03);">
+                                    <h4 style="color: var(--primary); margin-bottom: 8px;">🛡️ Protection Logic Active</h4>
+                                    <ul style="font-size: 0.8rem; color: var(--text-muted); padding-left: 20px; margin: 0;">
+                                        <li>High performers are protected from overload (Max 8h/day).</li>
+                                        <li>Only stable/low burnout employees are suggested.</li>
+                                        <li>Department boundaries strictly enforced.</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
